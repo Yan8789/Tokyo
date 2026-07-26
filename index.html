@@ -1,0 +1,1736 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>出國準備 & 購物助手</title>
+    
+    <!-- Firebase SDK (使用 Compat 版本以便於單檔直接調用) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            /* 基礎字體稍微放大 */
+            font-size: 16px; 
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen pb-20">
+
+    <header class="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm">
+        <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-xl bg-brand-500 text-white flex items-center justify-center shadow-md shadow-brand-500/20">
+                    <i data-lucide="plane-takeoff" class="w-7 h-7"></i>
+                </div>
+                <div>
+                    <!-- 字體放大 text-lg -> text-xl -->
+                    <h1 class="font-bold text-xl text-slate-800 leading-tight">出國助手</h1>
+                    <!-- 字體放大 text-xs -> text-sm -->
+                    <p class="text-sm text-slate-500">旅行準備、購物清單與匯率記帳</p>
+                </div>
+            </div>
+            
+            <!-- VJW 連結與重置按鈕區塊 -->
+            <div class="flex items-center gap-1 sm:gap-2">
+                <button id="auth-btn" onclick="toggleAuth()" class="text-sm sm:text-base text-slate-500 hover:text-brand-600 flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg hover:bg-slate-100 transition font-medium">
+                    <i data-lucide="cloud" class="w-4 h-4"></i> <span id="auth-text" class="hidden sm:inline">未連線</span>
+                </button>
+
+                <a href="https://www.vjw.digital.go.jp/main/#/vjwplo001" target="_blank" rel="noopener noreferrer" class="text-sm sm:text-base text-brand-600 hover:text-brand-700 flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg hover:bg-brand-50 transition font-medium">
+                    <i data-lucide="external-link" class="w-4 h-4"></i> <span class="hidden sm:inline">VJW 入境</span>
+                </a>
+                <button onclick="openResetModal()" class="text-sm sm:text-base text-slate-400 hover:text-red-500 flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg hover:bg-slate-100 transition">
+                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i> 重置
+                </button>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="max-w-3xl mx-auto px-4 flex border-t border-slate-100 overflow-x-auto hide-scrollbar">
+            <!-- 標籤字體放大 text-xs sm:text-sm -> text-sm sm:text-base -->
+            <button id="tab-packing-btn" onclick="switchTab('packing')" class="flex-none py-3.5 px-4 text-sm sm:text-base font-semibold text-brand-600 border-b-2 border-brand-500 flex items-center justify-center gap-1.5 transition-all whitespace-nowrap">
+                <i data-lucide="luggage" class="w-5 h-5"></i> 行李 (<span id="packing-count">0</span>)
+            </button>
+            <button id="tab-shopping-btn" onclick="switchTab('shopping')" class="flex-none py-3.5 px-4 text-sm sm:text-base font-semibold text-slate-500 hover:text-slate-700 border-b-2 border-transparent flex items-center justify-center gap-1.5 transition-all whitespace-nowrap">
+                <i data-lucide="shopping-bag" class="w-5 h-5"></i> 購物 (<span id="shopping-count">0</span>)
+            </button>
+            <button id="tab-currency-btn" onclick="switchTab('currency')" class="flex-none py-3.5 px-4 text-sm sm:text-base font-semibold text-slate-500 hover:text-slate-700 border-b-2 border-transparent flex items-center justify-center gap-1.5 transition-all whitespace-nowrap">
+                <i data-lucide="calculator" class="w-5 h-5"></i> 匯率計算
+            </button>
+            <button id="tab-expenses-btn" onclick="switchTab('expenses')" class="flex-none py-3.5 px-4 text-sm sm:text-base font-semibold text-slate-500 hover:text-slate-700 border-b-2 border-transparent flex items-center justify-center gap-1.5 transition-all whitespace-nowrap">
+                <i data-lucide="receipt" class="w-5 h-5"></i> 花費記帳
+            </button>
+            <button id="tab-collage-btn" onclick="switchTab('collage')" class="flex-none py-3.5 px-4 text-sm sm:text-base font-semibold text-slate-500 hover:text-slate-700 border-b-2 border-transparent flex items-center justify-center gap-1.5 transition-all whitespace-nowrap">
+                <i data-lucide="layout" class="w-5 h-5"></i> IG 拼貼
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-3xl mx-auto px-4 pt-4">
+
+        <!-- ==================== PAGE 1: PACKING CHECKLIST ==================== -->
+        <section id="tab-packing" class="space-y-4">
+            
+            <!-- Progress Card -->
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-2 text-base">
+                    <span class="font-semibold text-slate-700 flex items-center gap-1.5">
+                        <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-500"></i> 打包完成度
+                    </span>
+                    <span id="progress-text" class="font-bold text-brand-600 text-lg">0%</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                    <div id="progress-bar" class="bg-brand-500 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Add Packing Item Form -->
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 space-y-3">
+                <form onsubmit="handleAddPacking(event)" class="flex flex-col sm:flex-row gap-2">
+                    <div class="flex-1 flex gap-2">
+                        <select id="packing-category" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-brand-500">
+                            <option value="證件">🪪 證件</option>
+                            <option value="電子">🔌 電子</option>
+                            <option value="衣物">👕 衣物</option>
+                            <option value="藥品">💊 藥品</option>
+                            <option value="其他" selected>📦 其他</option>
+                        </select>
+                        <input type="text" id="packing-input" placeholder="新增要帶的物品..." required class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    </div>
+                    <button type="submit" class="bg-brand-500 hover:bg-brand-600 text-white font-medium px-5 py-2.5 rounded-xl text-base flex items-center justify-center gap-1 shadow-sm active:scale-95 transition">
+                        <i data-lucide="plus" class="w-5 h-5"></i> 新增
+                    </button>
+                </form>
+
+                <!-- Quick Presets -->
+                <div class="pt-2 border-t border-slate-100">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-slate-500">快速預設必帶推薦：</span>
+                        <button onclick="loadPresets()" class="text-sm text-brand-600 font-medium hover:underline flex items-center gap-1">
+                            <i data-lucide="sparkles" class="w-4 h-4"></i> 載入熱門範本
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter Tabs for Packing -->
+            <div class="flex gap-2 overflow-x-auto hide-scrollbar py-1">
+                <button onclick="setPackingFilter('all')" class="packing-filter-btn px-4 py-2 rounded-xl text-sm font-medium bg-brand-500 text-white shadow-sm" data-filter="all">全部</button>
+                <button onclick="setPackingFilter('pending')" class="packing-filter-btn px-4 py-2 rounded-xl text-sm font-medium bg-white text-slate-600 border border-slate-200" data-filter="pending">未打包</button>
+                <button onclick="setPackingFilter('completed')" class="packing-filter-btn px-4 py-2 rounded-xl text-sm font-medium bg-white text-slate-600 border border-slate-200" data-filter="completed">已完成</button>
+            </div>
+
+            <!-- Packing Items List -->
+            <div id="packing-list" class="space-y-2.5">
+                <!-- Dynamic Items -->
+            </div>
+            
+            <div id="packing-empty" class="hidden text-center py-10 bg-white rounded-2xl border border-dashed border-slate-200">
+                <i data-lucide="check-check" class="w-14 h-14 mx-auto text-slate-300 mb-3"></i>
+                <p class="text-base font-medium text-slate-500">沒有符合條件的項目</p>
+                <p class="text-sm text-slate-400 mt-1">點擊上方「載入熱門範本」可快速填入常見出國必帶物品</p>
+            </div>
+
+        </section>
+
+        <!-- ==================== PAGE 2: SHOPPING LIST ==================== -->
+        <section id="tab-shopping" class="space-y-4 hidden">
+            
+            <!-- Add Shopping Item Card -->
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <h3 class="font-bold text-slate-800 text-base">出國購物必買清單</h3>
+                    <p class="text-sm text-slate-500">拍照或上傳圖片，採購比價超方便</p>
+                </div>
+                <button onclick="openShoppingModal()" class="bg-brand-500 hover:bg-brand-600 text-white font-medium px-4 py-2.5 rounded-xl text-sm sm:text-base flex items-center gap-1.5 shadow-sm active:scale-95 transition">
+                    <i data-lucide="plus" class="w-5 h-5"></i> 新增商品
+                </button>
+            </div>
+
+            <!-- Shopping List Grid -->
+            <div id="shopping-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <!-- Dynamic Shopping Cards -->
+            </div>
+
+            <div id="shopping-empty" class="hidden text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200">
+                <i data-lucide="shopping-cart" class="w-14 h-14 mx-auto text-slate-300 mb-3"></i>
+                <p class="text-base font-medium text-slate-500">購物清單還是空的</p>
+                <p class="text-sm text-slate-400 mt-1">點擊「新增商品」來加入心儀物品與照片吧！</p>
+            </div>
+
+        </section>
+
+        <!-- ==================== PAGE 3: CURRENCY CALCULATOR ==================== -->
+        <section id="tab-currency" class="space-y-4 hidden">
+            <!-- Rate Status Header -->
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                    <span id="rate-status-dot" class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <div>
+                        <div id="rate-status-title" class="font-bold text-slate-800 text-sm sm:text-base">即時線上匯率</div>
+                        <div id="rate-update-time" class="text-xs text-slate-500">正在獲取最新匯率...</div>
+                    </div>
+                </div>
+                <button onclick="fetchExchangeRates(true)" class="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl font-medium flex items-center gap-1.5 transition">
+                    <i data-lucide="refresh-cw" class="w-4 h-4" id="refresh-icon"></i> 重新更新
+                </button>
+            </div>
+
+            <!-- Currency Converter Card -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                    <i data-lucide="arrow-left-right" class="w-5 h-5 text-brand-500"></i> 即時匯率換算
+                </h3>
+
+                <div class="grid grid-cols-1 sm:grid-cols-5 gap-3 items-center">
+                    <!-- Source Amount & Currency -->
+                    <div class="sm:col-span-2 space-y-1.5">
+                        <label class="block text-sm font-medium text-slate-500">外幣金額 / 支付金額</label>
+                        <div class="flex rounded-xl border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-brand-500">
+                            <input type="number" id="calc-amount" value="10000" step="any" oninput="calculateExchange()" placeholder="輸入金額" class="w-full bg-slate-50 px-3 py-3 text-slate-800 font-bold text-xl focus:outline-none">
+                            <select id="calc-from" onchange="calculateExchange()" class="bg-slate-100 px-2 sm:px-3 text-sm sm:text-base font-semibold text-slate-700 border-l border-slate-200 focus:outline-none">
+                                <option value="JPY">🇯🇵 JPY 日圓</option>
+                                <option value="KRW">🇰🇷 KRW 韓元</option>
+                                <option value="USD">🇺🇸 USD 美金</option>
+                                <option value="EUR">🇪🇺 EUR 歐元</option>
+                                <option value="THB">🇹🇭 THB 泰銖</option>
+                                <option value="CNY">🇨🇳 CNY 人民幣</option>
+                                <option value="HKD">🇭🇰 HKD 港幣</option>
+                                <option value="GBP">🇬🇧 GBP 英鎊</option>
+                                <option value="VND">🇻🇳 VND 越南盾</option>
+                                <option value="TWD">🇹🇼 TWD 台幣</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Swap Button -->
+                    <div class="flex justify-center sm:pt-6">
+                        <button onclick="swapCurrencies()" class="w-12 h-12 rounded-full bg-slate-100 hover:bg-brand-50 hover:text-brand-600 text-slate-500 flex items-center justify-center transition shadow-sm active:scale-95">
+                            <i data-lucide="arrow-left-right" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+
+                    <!-- Target Amount & Currency -->
+                    <div class="sm:col-span-2 space-y-1.5">
+                        <label class="block text-sm font-medium text-slate-500">換算結果</label>
+                        <div class="flex rounded-xl border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-brand-500">
+                            <input type="text" id="calc-result" readonly placeholder="0" class="w-full bg-slate-100 px-3 py-3 text-brand-600 font-bold text-xl focus:outline-none">
+                            <select id="calc-to" onchange="calculateExchange()" class="bg-slate-100 px-2 sm:px-3 text-sm sm:text-base font-semibold text-slate-700 border-l border-slate-200 focus:outline-none">
+                                <option value="TWD" selected>🇹🇼 TWD 台幣</option>
+                                <option value="JPY">🇯🇵 JPY 日圓</option>
+                                <option value="KRW">🇰🇷 KRW 韓元</option>
+                                <option value="USD">🇺🇸 USD 美金</option>
+                                <option value="EUR">🇪🇺 EUR 歐元</option>
+                                <option value="THB">🇹🇭 THB 泰銖</option>
+                                <option value="CNY">🇨🇳 CNY 人民幣</option>
+                                <option value="HKD">🇭🇰 HKD 港幣</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Amount Buttons -->
+                <div class="flex flex-wrap gap-2 pt-2 items-center">
+                    <span class="text-sm text-slate-500 font-medium">快速加額：</span>
+                    <button onclick="setCalcAmount(100)" class="px-3 py-1.5 text-sm rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium">+100</button>
+                    <button onclick="setCalcAmount(1000)" class="px-3 py-1.5 text-sm rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium">+1,000</button>
+                    <button onclick="setCalcAmount(5000)" class="px-3 py-1.5 text-sm rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium">+5,000</button>
+                    <button onclick="setCalcAmount(10000)" class="px-3 py-1.5 text-sm rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium">+10,000</button>
+                    <button onclick="clearCalcAmount()" class="px-3 py-1.5 text-sm rounded-lg bg-rose-50 text-rose-600 font-bold hover:bg-rose-100 ml-auto">歸零</button>
+                </div>
+
+                <!-- Custom Rate Option -->
+                <div class="p-3 bg-slate-50 rounded-xl text-sm space-y-2 border border-slate-200">
+                    <div class="flex justify-between items-center text-slate-600">
+                        <span>參考匯率：</span>
+                        <span id="rate-display-info" class="font-bold text-slate-800">1 JPY ≈ 0.2150 TWD</span>
+                    </div>
+                    <div class="pt-2 border-t border-slate-200/60 flex flex-wrap gap-2 items-center justify-between">
+                        <label class="text-slate-600 flex items-center gap-2 cursor-pointer font-medium">
+                            <input type="checkbox" id="custom-rate-checkbox" onchange="toggleCustomRate()" class="w-4 h-4 rounded text-brand-500 focus:ring-brand-500">
+                            使用自訂匯率 (包含現金牌告價)
+                        </label>
+                        <input type="number" id="custom-rate-input" step="any" placeholder="例如: 0.218" oninput="calculateExchange()" disabled class="w-28 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-50">
+                    </div>
+                </div>
+
+                <!-- Cathay CUBE JCB Credit Card Feature -->
+                <div class="bg-gradient-to-br from-emerald-600 to-teal-700 text-white p-5 rounded-2xl shadow-sm space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <span class="bg-white/20 text-white p-2 rounded-xl">
+                                <i data-lucide="credit-card" class="w-5 h-5"></i>
+                            </span>
+                            <div>
+                                <h4 class="font-bold text-base">國泰 CUBE 卡 (趣旅行 3% 回饋)</h4>
+                                <p class="text-xs text-emerald-100 mt-0.5">海外 JCB 刷卡實付估算（扣除 1.5% 手續費）</p>
+                            </div>
+                        </div>
+                        <span class="bg-amber-400 text-slate-900 font-extrabold text-xs px-2.5 py-1 rounded-full shadow-sm">趣旅行</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 pt-2 border-t border-white/20">
+                        <div class="bg-white/10 p-3 rounded-xl">
+                            <span class="text-emerald-100 block text-xs mb-1">原刷卡折合台幣</span>
+                            <span id="cube-base-twd" class="font-bold text-lg">NT$ 0</span>
+                        </div>
+                        <div class="bg-white/10 p-3 rounded-xl">
+                            <span class="text-emerald-100 block text-xs mb-1">預估海外手續費 (1.5%)</span>
+                            <span id="cube-fee-twd" class="font-semibold text-amber-200 text-base">+NT$ 0</span>
+                        </div>
+                        <div class="bg-white/10 p-3 rounded-xl">
+                            <span class="text-emerald-100 block text-xs mb-1">小樹點回饋 (3%)</span>
+                            <span id="cube-points" class="font-semibold text-emerald-200 text-base">0 點</span>
+                        </div>
+                        <div class="bg-emerald-900/40 border border-emerald-300/30 p-3 rounded-xl">
+                            <span class="text-emerald-200 block text-xs font-medium mb-1">扣除回饋後實質費用</span>
+                            <span id="cube-net-twd" class="font-extrabold text-lg text-yellow-300">NT$ 0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Rate Cheat Sheet Table -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-3">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                        <i data-lucide="table" class="w-5 h-5 text-brand-500"></i> 常用金額速查表
+                    </h3>
+                    <span class="text-sm text-slate-500">對照換算</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-600 border-b border-slate-200">
+                                <th class="py-2.5 px-4 font-medium rounded-tl-xl">外幣金額</th>
+                                <th class="py-2.5 px-4 font-medium text-right rounded-tr-xl">折合目標幣別</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cheat-sheet-tbody">
+                            <!-- Dynamic rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== PAGE 4: EXPENSE TRACKER ==================== -->
+        <section id="tab-expenses" class="space-y-4 hidden">
+            
+            <!-- Top Summary Cards -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <!-- Cash Total -->
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1.5">
+                    <div class="flex items-center gap-1.5 text-sm text-slate-600 font-medium">
+                        <i data-lucide="banknote" class="w-4 h-4 text-amber-500"></i> 現金總額
+                    </div>
+                    <div id="summary-cash-foreign" class="text-base font-bold text-slate-800">¥0</div>
+                    <div id="summary-cash-twd" class="text-xs text-slate-500">NT$ 0</div>
+                </div>
+
+                <!-- Card Total -->
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1.5">
+                    <div class="flex items-center gap-1.5 text-sm text-slate-600 font-medium">
+                        <i data-lucide="credit-card" class="w-4 h-4 text-emerald-500"></i> 刷卡總額
+                    </div>
+                    <div id="summary-card-foreign" class="text-base font-bold text-slate-800">¥0</div>
+                    <div id="summary-card-twd" class="text-xs text-slate-500">NT$ 0</div>
+                </div>
+
+                <!-- Foreign Currency Total (Cash + Card) -->
+                <div class="bg-white p-4 rounded-2xl border border-brand-200 bg-brand-50/30 shadow-sm space-y-1.5">
+                    <div class="flex items-center gap-1.5 text-sm text-brand-700 font-bold">
+                        <i data-lucide="coins" class="w-4 h-4 text-brand-500"></i> 外幣/日幣總額
+                    </div>
+                    <div id="summary-total-foreign" class="text-lg font-extrabold text-brand-600">¥0</div>
+                    <div class="text-xs text-brand-500 font-medium">(現金 + 刷卡)</div>
+                </div>
+
+                <!-- TWD Total (Cash + Card) -->
+                <div class="bg-white p-4 rounded-2xl border border-emerald-200 bg-emerald-50/30 shadow-sm space-y-1.5">
+                    <div class="flex items-center gap-1.5 text-sm text-emerald-700 font-bold">
+                        <i data-lucide="wallet" class="w-4 h-4 text-emerald-500"></i> 台幣總額
+                    </div>
+                    <div id="summary-total-twd" class="text-lg font-extrabold text-emerald-600">NT$ 0</div>
+                    <div class="text-xs text-emerald-600 font-medium">(估算實質總花費)</div>
+                </div>
+            </div>
+
+            <!-- Add Expense Form -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                    <i data-lucide="plus-circle" class="w-5 h-5 text-brand-500"></i> 新增消費紀錄
+                </h3>
+                
+                <form onsubmit="handleAddExpense(event)" class="space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-600 mb-1.5">項目名稱 *</label>
+                            <input type="text" id="expense-title" required placeholder="例如：一蘭拉麵 / 地鐵一日券" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-600 mb-1.5">消費類別</label>
+                            <select id="expense-category" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-brand-500">
+                                <option value="餐飲">🍜 餐飲美食</option>
+                                <option value="購物">🛍️ 購物採買</option>
+                                <option value="交通">🚆 交通車票</option>
+                                <option value="住宿">🏨 飯店住宿</option>
+                                <option value="門票">🎟️ 景點門票</option>
+                                <option value="其他">📦 其他雜支</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-600 mb-1.5">外幣金額 (例如 JPY) *</label>
+                            <input type="number" id="expense-amount" step="any" required placeholder="0" oninput="updateExpenseTWDPreview()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-base font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-600 mb-1.5">付款方式 *</label>
+                            <select id="expense-payment" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-base font-medium focus:outline-none focus:ring-2 focus:ring-brand-500">
+                                <option value="cash">💵 現金付費</option>
+                                <option value="cube_card" selected>💳 國泰 CUBE 卡 (趣旅行 3%)</option>
+                                <option value="other_card">💳 其他信用卡</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-600 mb-1.5">估算折合台幣</label>
+                            <input type="text" id="expense-twd-preview" readonly placeholder="NT$ 0" class="w-full bg-slate-100 border border-slate-200 rounded-xl px-4 py-2.5 text-base font-bold text-brand-600 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-brand-500 hover:bg-brand-600 text-white font-bold py-3 rounded-xl text-base flex items-center justify-center gap-2 shadow-sm active:scale-95 transition">
+                        <i data-lucide="check" class="w-5 h-5"></i> 記入帳本
+                    </button>
+                </form>
+            </div>
+
+            <!-- Expense History List -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                        <i data-lucide="list-ordered" class="w-5 h-5 text-brand-500"></i> 消費明細紀錄
+                    </h3>
+                    <span id="expense-count-badge" class="text-sm font-medium text-slate-500">共 0 筆</span>
+                </div>
+
+                <div id="expenses-list" class="space-y-3">
+                    <!-- Dynamic expenses -->
+                </div>
+
+                <div id="expenses-empty" class="hidden text-center py-10">
+                    <i data-lucide="receipt" class="w-14 h-14 mx-auto text-slate-300 mb-3"></i>
+                    <p class="text-sm font-medium text-slate-500">尚無任何消費紀錄，開始記第一筆吧！</p>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ==================== PAGE 5: IG COLLAGE ==================== -->
+        <section id="tab-collage" class="space-y-4 hidden">
+            <!-- Collage Info -->
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center">
+                <div>
+                    <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                        <i data-lucide="instagram" class="w-5 h-5 text-pink-500"></i> IG 限動拼貼
+                    </h3>
+                    <p class="text-sm text-slate-500">1080x1920 無損高畫質直式輸出</p>
+                </div>
+                <button onclick="clearCollage()" class="text-sm text-slate-400 hover:text-rose-500 flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i> 清空
+                </button>
+            </div>
+
+            <!-- Layout Toggles -->
+            <div class="flex gap-2">
+                <button id="layout-btn-3-row" onclick="setCollageLayout('3-row')" class="flex-1 py-3 rounded-xl text-sm sm:text-base font-bold transition shadow-sm bg-brand-500 text-white border-transparent">
+                    橫的平均 3 張
+                </button>
+                <button id="layout-btn-6-grid" onclick="setCollageLayout('6-grid')" class="flex-1 py-3 rounded-xl text-sm sm:text-base font-bold transition border bg-white text-slate-600 border-slate-200 hover:bg-slate-50">
+                    整張平均 6 張
+                </button>
+            </div>
+
+            <p class="text-center text-sm font-medium text-slate-500">👇 點擊畫布中的格子來加入照片</p>
+
+            <!-- Canvas Container -->
+            <div class="relative w-full max-w-sm mx-auto bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
+                <!-- 這個 Canvas 實際解析度將保持 1080x1920 -->
+                <canvas id="ig-collage-canvas" class="w-full h-auto aspect-[9/16] cursor-pointer touch-manipulation hover:opacity-95 transition"></canvas>
+                <!-- 隱藏的檔案上傳輸入框 -->
+                <input type="file" id="collage-file-input" accept="image/*" class="hidden" onchange="handleCollageUpload(event)">
+            </div>
+
+            <!-- Download Button -->
+            <button onclick="downloadCollage()" class="w-full max-w-sm mx-auto bg-gradient-to-r from-pink-500 to-orange-400 hover:from-pink-600 hover:to-orange-500 text-white font-bold py-3.5 rounded-xl text-base flex items-center justify-center gap-2 shadow-md active:scale-95 transition">
+                <i data-lucide="download" class="w-5 h-5"></i> 儲存高畫質拼貼
+            </button>
+        </section>
+
+    </main>
+
+    <!-- Modal: Add Shopping Item -->
+    <div id="shopping-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 opacity-0 pointer-events-none transition-opacity duration-200">
+        <div class="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-6 shadow-xl transform translate-y-full sm:translate-y-0 transition-transform duration-200 space-y-5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2">
+                    <i data-lucide="shopping-bag" class="w-6 h-6 text-brand-500"></i> 新增想買商品
+                </h3>
+                <button onclick="closeShoppingModal()" class="text-slate-400 hover:text-slate-600 p-1 bg-slate-100 hover:bg-slate-200 rounded-full transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleAddShopping(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">商品名稱 *</label>
+                    <input type="text" id="shop-title" required placeholder="例：合利他命 EX Plus / 保濕面膜" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-brand-500">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">備註 / 規格 / 數量 / 價格</label>
+                    <textarea id="shop-note" rows="2" placeholder="例：270錠裝，藥妝店比價，預算約 ¥6000" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1.5">商品圖片</label>
+                    <div class="relative border-2 border-dashed border-slate-300 hover:border-brand-500 rounded-xl p-4 text-center cursor-pointer transition bg-slate-50">
+                        <input type="file" id="shop-image-input" accept="image/*" onchange="handleImageSelect(event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                        <div id="image-preview-container" class="hidden">
+                            <img id="image-preview" class="max-h-40 mx-auto rounded-lg object-contain mb-2 shadow-sm">
+                            <span class="text-sm text-brand-600 font-bold bg-brand-50 px-3 py-1 rounded-full">點擊更換照片</span>
+                        </div>
+                        <div id="image-upload-prompt" class="py-4 space-y-2">
+                            <i data-lucide="camera" class="w-10 h-10 text-slate-400 mx-auto"></i>
+                            <p class="text-sm text-slate-600 font-bold">上傳或拍下商品照片</p>
+                            <p class="text-xs text-slate-400">支援 JPG、PNG，將自動壓縮優化</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-2 flex gap-3">
+                    <button type="button" onclick="closeShoppingModal()" class="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 text-base font-bold hover:bg-slate-50 transition">取消</button>
+                    <button type="submit" class="flex-1 py-3 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-base font-bold shadow-sm transition">儲存商品</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Reset Confirmation Dialog (輸入 0000 驗證) -->
+    <div id="reset-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl space-y-5 text-center">
+            <div class="w-14 h-14 rounded-full bg-rose-100 text-rose-500 flex items-center justify-center mx-auto shadow-sm">
+                <i data-lucide="alert-triangle" class="w-7 h-7"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-slate-800 text-lg">確定要重置清單嗎？</h3>
+                <p class="text-sm text-slate-500 mt-2 leading-relaxed">此動作將會清除所有您建立的行李與購物數據，無法復原。</p>
+            </div>
+            
+            <div class="text-left bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <label class="block text-sm font-bold text-slate-700 mb-1.5 text-center">請輸入 <span class="text-rose-500">0000</span> 以確認</label>
+                <input type="text" id="reset-code-input" placeholder="0000" maxlength="4" class="w-full text-center bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-lg font-bold tracking-[0.2em] focus:outline-none focus:ring-2 focus:ring-rose-500 text-slate-800 transition-colors">
+                <p id="reset-error-msg" class="text-rose-500 text-xs mt-1.5 font-medium text-center hidden">驗證碼錯誤，請重新輸入</p>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button onclick="closeResetModal()" class="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-base font-bold hover:bg-slate-50 transition">取消</button>
+                <button onclick="executeReset()" class="flex-1 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-base font-bold shadow-sm transition active:scale-95">確認清除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: ImageViewer -->
+    <div id="image-modal" class="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200" onclick="closeImageModal()">
+        <div class="relative max-w-xl w-full">
+            <button onclick="closeImageModal()" class="absolute -top-12 right-0 text-white/80 hover:text-white p-2 bg-white/10 hover:bg-white/20 rounded-full transition">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+            <img id="modal-img" class="w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl">
+            <p id="modal-img-title" class="text-center text-white font-medium mt-4 text-base"></p>
+        </div>
+    </div>
+
+    <!-- Modal: Environment Error (For Preview Sandboxes) -->
+    <div id="env-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl space-y-5 text-center">
+            <div class="w-14 h-14 rounded-full bg-amber-100 text-amber-500 flex items-center justify-center mx-auto shadow-sm">
+                <i data-lucide="info" class="w-7 h-7"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-slate-800 text-lg">預覽環境限制</h3>
+                <p class="text-sm text-slate-600 mt-3 leading-relaxed text-left">
+                    由於目前的「程式碼預覽環境」為沙盒模式，不支援 Google 登入彈出視窗。
+                </p>
+                <div class="bg-slate-50 p-3 mt-3 rounded-xl border border-slate-100 text-left">
+                    <span class="text-xs font-bold text-brand-600 block mb-1">💡 如何解決？</span>
+                    <p class="text-xs text-slate-500">
+                        請將這份檔案下載並儲存為 <span class="bg-white border border-slate-200 px-1 py-0.5 rounded font-mono text-slate-700">index.html</span>，直接在您的電腦中用瀏覽器開啟，或是上傳到正式的網站空間即可正常登入！
+                    </p>
+                </div>
+            </div>
+            <div class="pt-2">
+                <button onclick="closeEnvModal()" class="w-full py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-base font-bold shadow-sm transition active:scale-95">我了解了</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-5 py-3 rounded-full text-sm font-bold shadow-xl z-50 opacity-0 pointer-events-none transition-all duration-300 flex items-center gap-2">
+        <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>
+        <span id="toast-msg">操作成功</span>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'travel_assistant_data_v4';
+        const EXCHANGE_STORAGE_KEY = 'travel_exchange_rates_v1';
+        
+        let appData = {
+            packing: [],
+            shopping: [],
+            expenses: []
+        };
+
+        let exchangeRates = {
+            USD: 1,
+            TWD: 32.5,
+            JPY: 153.5,
+            KRW: 1380,
+            EUR: 0.92,
+            GBP: 0.78,
+            THB: 36.2,
+            CNY: 7.25,
+            HKD: 7.81,
+            VND: 25400
+        };
+
+        let lastRateUpdate = null;
+        let isOnlineRate = false;
+        let currentFilter = 'all';
+        let tempBase64Image = '';
+
+        // ==========================================
+        // 🔴 Firebase 雲端設定區塊
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyC9hGn1qoXoCYFfbsb5skKufAXDwFA5YY4",
+            authDomain: "tokyo-72cf6.firebaseapp.com",
+            databaseURL: "https://tokyo-72cf6-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "tokyo-72cf6",
+            storageBucket: "tokyo-72cf6.firebasestorage.app",
+            messagingSenderId: "667762837986",
+            appId: "1:667762837986:web:f9aeeaedfeb591b74191bb"
+        };
+
+        // 判斷是否已經填寫了 Firebase 金鑰
+        let isFirebaseReady = Object.keys(firebaseConfig).length > 0;
+        let currentUser = null;
+
+        if (isFirebaseReady) {
+            firebase.initializeApp(firebaseConfig);
+            
+            // 監聽 Google 登入狀態變化
+            firebase.auth().onAuthStateChanged((user) => {
+                currentUser = user;
+                const authText = document.getElementById('auth-text');
+                const authBtn = document.getElementById('auth-btn');
+                const authIcon = authBtn.querySelector('i');
+                
+                if (user) {
+                    if (authText) authText.textContent = '已連線雲端';
+                    if (authBtn) authBtn.classList.add('text-brand-600', 'bg-brand-50');
+                    if (authIcon) authIcon.setAttribute('data-lucide', 'cloud-check');
+                    safeCreateIcons();
+                    
+                    loadDataFromCloud(); // 登入成功後，拉取雲端資料覆蓋本地
+                    showToast('登入成功，雲端同步已啟動');
+                } else {
+                    if (authText) authText.textContent = '登入雲端同步';
+                    if (authBtn) authBtn.classList.remove('text-brand-600', 'bg-brand-50');
+                    if (authIcon) authIcon.setAttribute('data-lucide', 'cloud');
+                    safeCreateIcons();
+                    
+                    loadData(); // 登出後，載入原本瀏覽器內的離線資料
+                }
+            });
+        }
+
+        // 處理登入/登出按鈕點擊
+        function toggleAuth() {
+            if (!isFirebaseReady) {
+                showToast('若要啟用此功能，請先在程式碼中填寫 Firebase Config 喔！');
+                return;
+            }
+            if (currentUser) {
+                // 已登入 -> 執行登出
+                firebase.auth().signOut().then(() => showToast('已登出雲端同步'));
+            } else {
+                // 未登入 -> 彈出 Google 登入視窗
+                const provider = new firebase.auth.GoogleAuthProvider();
+                firebase.auth().signInWithPopup(provider).catch(e => {
+                    console.error('Login failed', e);
+                    if (e.code === 'auth/operation-not-supported-in-this-environment') {
+                        // 攔截因為預覽環境沙盒導致的錯誤，顯示友善的教學視窗
+                        openEnvModal();
+                    } else {
+                        showToast('登入取消或發生錯誤');
+                    }
+                });
+            }
+        }
+
+        // 從雲端 (Firestore) 拉取使用者的專屬資料
+        function loadDataFromCloud() {
+            if (!isFirebaseReady || !currentUser) return;
+            
+            firebase.firestore().collection('users').doc(currentUser.uid).get()
+                .then((doc) => {
+                    if (doc.exists) {
+                        const parsed = doc.data();
+                        appData = {
+                            packing: parsed.packing || [],
+                            shopping: parsed.shopping || [],
+                            expenses: parsed.expenses || []
+                        };
+                        // 把雲端的資料也備份到本地
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+                        renderAll();
+                        showToast('已成功載入雲端紀錄');
+                    } else {
+                        // 雲端還沒有資料，把目前的本地資料寫上去
+                        saveData(); 
+                    }
+                })
+                .catch((e) => {
+                    console.error("讀取雲端資料失敗:", e);
+                    showToast('讀取雲端失敗，切換為離線模式');
+                });
+        }
+        // ==========================================
+
+        // 新增：IG Collage 全域變數
+        let currentCollageLayout = '3-row';
+        let collageImages = new Array(6).fill(null); // 最多 6 張，存 Image 物件
+        let clickedCollageSlot = -1;
+
+        const DEFAULT_PRESETS = [
+            { text: '護照 (效期6個月以上)', category: '證件' },
+            { text: '身分證 / 護照影本', category: '證件' },
+            { text: '外幣現金 & 信用卡', category: '證件' },
+            { text: '手機與充電線', category: '電子' },
+            { text: '行動電源 (需隨身攜帶)', category: '電子' },
+            { text: '網卡 / eSIM 兌換碼', category: '電子' },
+            { text: '個人換洗衣物 / 內著', category: '衣物' },
+            { text: '舒適走路鞋', category: '衣物' },
+            { text: '個人常用藥品 / 腸胃藥', category: '藥品' },
+            { text: '口罩 / 隨身面紙濕紙巾', category: '藥品' },
+            { text: '牙刷牙膏 / 保養品', category: '其他' },
+        ];
+
+        function safeCreateIcons() {
+            if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                lucide.createIcons();
+            }
+        }
+
+        // 頁面載入
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            loadExchangeData();
+            fetchExchangeRates();
+            safeCreateIcons();
+            renderAll();
+            calculateExchange();
+            
+            // 初始化拼貼畫布設定
+            setupCollageCanvas();
+
+            window.addEventListener('online', () => fetchExchangeRates(true));
+            window.addEventListener('offline', () => updateRateStatusUI(false));
+        });
+
+        // 儲存與讀取邏輯
+        function loadData() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                try {
+                    const parsed = JSON.parse(stored);
+                    appData = {
+                        packing: parsed.packing || [],
+                        shopping: parsed.shopping || [],
+                        expenses: parsed.expenses || []
+                    };
+                } catch (e) {
+                    console.error('Failed to parse storage', e);
+                }
+            } else {
+                appData.packing = DEFAULT_PRESETS.slice(0, 6).map((item, idx) => ({
+                    id: 'p_' + Date.now() + '_' + idx,
+                    text: item.text,
+                    category: item.category,
+                    completed: false
+                }));
+                saveData();
+            }
+        }
+
+        function saveData() {
+            // 儲存到瀏覽器本地端
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+            
+            // 如果 Firebase 已經準備好，而且使用者有登入，就同時把資料寫入 Firestore
+            if (isFirebaseReady && currentUser) {
+                firebase.firestore().collection('users').doc(currentUser.uid).set(appData)
+                    .catch(e => console.error("Firebase 同步寫入失敗", e));
+            }
+            
+            renderAll();
+        }
+
+        function renderAll() {
+            renderPacking();
+            renderShopping();
+            renderExpenses();
+            updateCounts();
+        }
+
+        function switchTab(tab) {
+            const tabs = ['packing', 'shopping', 'currency', 'expenses', 'collage'];
+            
+            tabs.forEach(t => {
+                const btn = document.getElementById(`tab-${t}-btn`);
+                const page = document.getElementById(`tab-${t}`);
+                if (btn && page) {
+                    if (t === tab) {
+                        page.classList.remove('hidden');
+                        btn.className = 'flex-none py-3.5 px-4 text-sm sm:text-base font-bold text-brand-600 border-b-2 border-brand-500 flex items-center justify-center gap-1.5 transition-all whitespace-nowrap';
+                    } else {
+                        page.classList.add('hidden');
+                        btn.className = 'flex-none py-3.5 px-4 text-sm sm:text-base font-semibold text-slate-500 hover:text-slate-700 border-b-2 border-transparent flex items-center justify-center gap-1.5 transition-all whitespace-nowrap';
+                    }
+                }
+            });
+
+            if (tab === 'currency') calculateExchange();
+            if (tab === 'expenses') updateExpenseTWDPreview();
+            if (tab === 'collage') renderCollageCanvas(); // 切換時重繪畫布
+        }
+
+        function updateCounts() {
+            const packingEl = document.getElementById('packing-count');
+            const shoppingEl = document.getElementById('shopping-count');
+            if (packingEl) packingEl.textContent = appData.packing.length;
+            if (shoppingEl) shoppingEl.textContent = appData.shopping.length;
+        }
+
+        function handleAddPacking(e) {
+            e.preventDefault();
+            const input = document.getElementById('packing-input');
+            const categorySelect = document.getElementById('packing-category');
+            const text = input.value.trim();
+
+            if (!text) return;
+
+            appData.packing.unshift({
+                id: 'p_' + Date.now(),
+                text: text,
+                category: categorySelect.value,
+                completed: false
+            });
+
+            input.value = '';
+            saveData();
+            showToast('已新增打包項目');
+        }
+
+        function togglePackingItem(id) {
+            const item = appData.packing.find(i => i.id === id);
+            if (item) {
+                item.completed = !item.completed;
+                saveData();
+            }
+        }
+
+        function deletePackingItem(id) {
+            appData.packing = appData.packing.filter(i => i.id !== id);
+            saveData();
+            showToast('已刪除項目');
+        }
+
+        function setPackingFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.packing-filter-btn').forEach(btn => {
+                if (btn.dataset.filter === filter) {
+                    btn.className = 'packing-filter-btn px-4 py-2 rounded-xl text-sm font-medium bg-brand-500 text-white shadow-sm';
+                } else {
+                    btn.className = 'packing-filter-btn px-4 py-2 rounded-xl text-sm font-medium bg-white text-slate-600 border border-slate-200';
+                }
+            });
+            renderPacking();
+        }
+
+        function loadPresets() {
+            let addedCount = 0;
+            DEFAULT_PRESETS.forEach((preset, idx) => {
+                if (!appData.packing.some(item => item.text === preset.text)) {
+                    appData.packing.push({
+                        id: 'p_preset_' + Date.now() + '_' + idx,
+                        text: preset.text,
+                        category: preset.category,
+                        completed: false
+                    });
+                    addedCount++;
+                }
+            });
+
+            if (addedCount > 0) {
+                saveData();
+                showToast(`已成功匯入 ${addedCount} 個必帶項目`);
+            } else {
+                showToast('預設項目皆已在清單中');
+            }
+        }
+
+        function renderPacking() {
+            const listEl = document.getElementById('packing-list');
+            const emptyEl = document.getElementById('packing-empty');
+            if (!listEl) return;
+            
+            const total = appData.packing.length;
+            const completedCount = appData.packing.filter(i => i.completed).length;
+            const percentage = total === 0 ? 0 : Math.round((completedCount / total) * 100);
+            
+            const progressBar = document.getElementById('progress-bar');
+            const progressText = document.getElementById('progress-text');
+            if (progressBar) progressBar.style.width = percentage + '%';
+            if (progressText) progressText.textContent = percentage + '%';
+
+            let filtered = appData.packing;
+            if (currentFilter === 'pending') filtered = appData.packing.filter(i => !i.completed);
+            if (currentFilter === 'completed') filtered = appData.packing.filter(i => i.completed);
+
+            if (filtered.length === 0) {
+                listEl.innerHTML = '';
+                if (emptyEl) emptyEl.classList.remove('hidden');
+                return;
+            } else {
+                if (emptyEl) emptyEl.classList.add('hidden');
+            }
+
+            const categoryBadges = {
+                '證件': 'bg-amber-100 text-amber-700',
+                '電子': 'bg-blue-100 text-blue-700',
+                '衣物': 'bg-purple-100 text-purple-700',
+                '藥品': 'bg-rose-100 text-rose-700',
+                '其他': 'bg-slate-100 text-slate-600'
+            };
+
+            listEl.innerHTML = filtered.map(item => `
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-3 group transition hover:shadow-md ${item.completed ? 'bg-slate-50/70 border-slate-200/80 opacity-80' : ''}">
+                    <div class="flex items-center gap-3 min-w-0 flex-1 cursor-pointer" onclick="togglePackingItem('${item.id}')">
+                        <div class="w-6 h-6 rounded-lg border-2 ${item.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 bg-white'} flex items-center justify-center transition shrink-0">
+                            ${item.completed ? '<i data-lucide="check" class="w-4 h-4 text-white font-bold"></i>' : ''}
+                        </div>
+                        <span class="text-xs px-2.5 py-1 rounded-md font-bold shrink-0 ${categoryBadges[item.category] || categoryBadges['其他']}">
+                            ${item.category}
+                        </span>
+                        <span class="text-base text-slate-800 truncate ${item.completed ? 'line-through text-slate-500' : 'font-bold'}">
+                            ${escapeHtml(item.text)}
+                        </span>
+                    </div>
+                    <button onclick="deletePackingItem('${item.id}')" class="text-slate-300 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition shrink-0">
+                        <i data-lucide="trash-2" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            `).join('');
+
+            safeCreateIcons();
+        }
+
+        function openShoppingModal() {
+            document.getElementById('shopping-modal').classList.remove('opacity-0', 'pointer-events-none');
+            document.getElementById('shopping-modal').children[0].classList.remove('translate-y-full');
+            tempBase64Image = '';
+            document.getElementById('image-preview-container').classList.add('hidden');
+            document.getElementById('image-upload-prompt').classList.remove('hidden');
+            document.getElementById('shop-image-input').value = '';
+        }
+
+        function closeShoppingModal() {
+            document.getElementById('shopping-modal').classList.add('opacity-0', 'pointer-events-none');
+            document.getElementById('shopping-modal').children[0].classList.add('translate-y-full');
+        }
+
+        function handleImageSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const maxDim = 800;
+
+                    if (width > height && width > maxDim) {
+                        height *= maxDim / width;
+                        width = maxDim;
+                    } else if (height > maxDim) {
+                        width *= maxDim / height;
+                        height = maxDim;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    tempBase64Image = canvas.toDataURL('image/jpeg', 0.7);
+
+                    document.getElementById('image-preview').src = tempBase64Image;
+                    document.getElementById('image-preview-container').classList.remove('hidden');
+                    document.getElementById('image-upload-prompt').classList.add('hidden');
+                };
+                img.src = evt.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleAddShopping(e) {
+            e.preventDefault();
+            const titleInput = document.getElementById('shop-title');
+            const noteInput = document.getElementById('shop-note');
+
+            const title = titleInput.value.trim();
+            if (!title) return;
+
+            appData.shopping.unshift({
+                id: 's_' + Date.now(),
+                title: title,
+                note: noteInput.value.trim(),
+                image: tempBase64Image,
+                purchased: false
+            });
+
+            titleInput.value = '';
+            noteInput.value = '';
+            tempBase64Image = '';
+            closeShoppingModal();
+            saveData();
+            showToast('已新增購物項目');
+        }
+
+        function toggleShoppingPurchased(id) {
+            const item = appData.shopping.find(i => i.id === id);
+            if (item) {
+                item.purchased = !item.purchased;
+                saveData();
+            }
+        }
+
+        function deleteShoppingItem(id) {
+            appData.shopping = appData.shopping.filter(i => i.id !== id);
+            saveData();
+            showToast('已刪除商品');
+        }
+
+        function renderShopping() {
+            const gridEl = document.getElementById('shopping-grid');
+            const emptyEl = document.getElementById('shopping-empty');
+            if (!gridEl) return;
+
+            if (appData.shopping.length === 0) {
+                gridEl.innerHTML = '';
+                if (emptyEl) emptyEl.classList.remove('hidden');
+                return;
+            } else {
+                if (emptyEl) emptyEl.classList.add('hidden');
+            }
+
+            gridEl.innerHTML = appData.shopping.map(item => `
+                <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm flex flex-col justify-between hover:shadow-md transition ${item.purchased ? 'opacity-60 bg-slate-50' : ''}">
+                    <div>
+                        <div class="relative w-full aspect-square bg-slate-100 overflow-hidden group">
+                            ${item.image ? `
+                                <img src="${item.image}" alt="${escapeHtml(item.title)}" class="w-full h-full object-cover cursor-pointer hover:scale-105 transition duration-300" onclick="viewImage('${item.image}', '${escapeHtml(item.title)}')">
+                            ` : `
+                                <div class="w-full h-full flex flex-col items-center justify-center text-slate-300">
+                                    <i data-lucide="image-off" class="w-10 h-10 mb-2"></i>
+                                    <span class="text-xs font-medium">無圖片</span>
+                                </div>
+                            `}
+                            
+                            ${item.purchased ? `
+                                <div class="absolute top-2 left-2 bg-emerald-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-md flex items-center gap-1">
+                                    <i data-lucide="check" class="w-3 h-3"></i> 已購買
+                                </div>
+                            ` : ''}
+                        </div>
+
+                        <div class="p-3.5">
+                            <h4 class="font-bold text-slate-800 text-base leading-snug line-clamp-2 ${item.purchased ? 'line-through text-slate-500' : ''}">
+                                ${escapeHtml(item.title)}
+                            </h4>
+                            ${item.note ? `
+                                <p class="text-sm text-slate-500 mt-1.5 line-clamp-3 whitespace-pre-line">${escapeHtml(item.note)}</p>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <div class="p-2.5 border-t border-slate-100 flex items-center justify-between gap-2 bg-slate-50/50">
+                        <button onclick="toggleShoppingPurchased('${item.id}')" class="text-sm px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 flex-1 justify-center ${item.purchased ? 'bg-slate-200 text-slate-600 hover:bg-slate-300' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'} transition">
+                            <i data-lucide="${item.purchased ? 'rotate-ccw' : 'check'}" class="w-4 h-4"></i>
+                            ${item.purchased ? '取消標記' : '標記已買'}
+                        </button>
+                        <button onclick="deleteShoppingItem('${item.id}')" class="text-slate-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-xl transition">
+                            <i data-lucide="trash-2" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            safeCreateIcons();
+        }
+
+        function loadExchangeData() {
+            const stored = localStorage.getItem(EXCHANGE_STORAGE_KEY);
+            if (stored) {
+                try {
+                    const parsed = JSON.parse(stored);
+                    if (parsed.rates) exchangeRates = parsed.rates;
+                    if (parsed.lastUpdate) lastRateUpdate = parsed.lastUpdate;
+                } catch (e) {
+                    console.error('Failed to parse saved exchange rates', e);
+                }
+            }
+        }
+
+        async function fetchExchangeRates(isManual = false) {
+            const refreshIcon = document.getElementById('refresh-icon');
+            if (refreshIcon) refreshIcon.classList.add('animate-spin');
+
+            try {
+                const res = await fetch('https://open.er-api.com/v6/latest/USD');
+                if (!res.ok) throw new Error('Network response failed');
+                const data = await res.json();
+
+                if (data && data.rates) {
+                    exchangeRates = { ...exchangeRates, ...data.rates };
+                    lastRateUpdate = new Date().toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    isOnlineRate = true;
+
+                    localStorage.setItem(EXCHANGE_STORAGE_KEY, JSON.stringify({
+                        rates: exchangeRates,
+                        lastUpdate: lastRateUpdate
+                    }));
+
+                    if (isManual) showToast('已成功更新最新即時匯率');
+                }
+            } catch (err) {
+                console.warn('Unable to fetch live rates, using cached/fallback rates:', err);
+                isOnlineRate = false;
+                if (isManual) showToast('無法取得線上匯率，目前為離線快取數據');
+            } finally {
+                if (refreshIcon) refreshIcon.classList.remove('animate-spin');
+                updateRateStatusUI(isOnlineRate);
+                calculateExchange();
+            }
+        }
+
+        function updateRateStatusUI(online) {
+            const dot = document.getElementById('rate-status-dot');
+            const title = document.getElementById('rate-status-title');
+            const time = document.getElementById('rate-update-time');
+
+            if (!dot || !title || !time) return;
+
+            if (online) {
+                dot.className = 'w-3 h-3 rounded-full bg-emerald-500 animate-pulse';
+                title.textContent = '即時線上匯率 (已連線)';
+                time.textContent = `最後更新: ${lastRateUpdate || '剛才'}`;
+            } else {
+                dot.className = 'w-3 h-3 rounded-full bg-amber-500';
+                title.textContent = '離線 / 備份匯率';
+                time.textContent = lastRateUpdate ? `上次更新: ${lastRateUpdate}` : '使用預設離線匯率';
+            }
+        }
+
+        function getExchangeRate(fromCurr, toCurr) {
+            const customCheckbox = document.getElementById('custom-rate-checkbox');
+            const customInput = document.getElementById('custom-rate-input');
+
+            if (customCheckbox && customCheckbox.checked && customInput && customInput.value) {
+                const customVal = parseFloat(customInput.value);
+                if (!isNaN(customVal) && customVal > 0) return customVal;
+            }
+
+            const fromUsd = exchangeRates[fromCurr] || 1;
+            const toUsd = exchangeRates[toCurr] || 1;
+            return toUsd / fromUsd;
+        }
+
+        function calculateExchange() {
+            const amountInput = document.getElementById('calc-amount');
+            const fromSelect = document.getElementById('calc-from');
+            const toSelect = document.getElementById('calc-to');
+            const resultInput = document.getElementById('calc-result');
+            const rateDisplay = document.getElementById('rate-display-info');
+
+            if (!amountInput || !fromSelect || !toSelect || !resultInput) return;
+
+            const amount = parseFloat(amountInput.value) || 0;
+            const from = fromSelect.value;
+            const to = toSelect.value;
+
+            const rate = getExchangeRate(from, to);
+            const converted = amount * rate;
+
+            let formattedResult = '';
+            if (to === 'TWD' || to === 'JPY' || to === 'KRW' || to === 'VND') {
+                formattedResult = Math.round(converted).toLocaleString('zh-TW');
+            } else {
+                formattedResult = converted.toFixed(2).toLocaleString('zh-TW');
+            }
+
+            resultInput.value = formattedResult;
+
+            if (rateDisplay) {
+                rateDisplay.textContent = `1 ${from} ≈ ${rate < 0.01 ? rate.toFixed(5) : rate.toFixed(4)} ${to}`;
+            }
+
+            calculateCubeCard(amount, from);
+            renderCheatSheet(from, to, rate);
+        }
+
+        function swapCurrencies() {
+            const fromSelect = document.getElementById('calc-from');
+            const toSelect = document.getElementById('calc-to');
+            if (fromSelect && toSelect) {
+                const temp = fromSelect.value;
+                fromSelect.value = toSelect.value;
+                toSelect.value = temp;
+                calculateExchange();
+            }
+        }
+
+        function setCalcAmount(addVal) {
+            const input = document.getElementById('calc-amount');
+            if (input) {
+                const current = parseFloat(input.value) || 0;
+                input.value = current + addVal;
+                calculateExchange();
+            }
+        }
+
+        function clearCalcAmount() {
+            const input = document.getElementById('calc-amount');
+            if (input) {
+                input.value = 0;
+                calculateExchange();
+            }
+        }
+
+        function toggleCustomRate() {
+            const checkbox = document.getElementById('custom-rate-checkbox');
+            const input = document.getElementById('custom-rate-input');
+            if (checkbox && input) {
+                input.disabled = !checkbox.checked;
+                if (checkbox.checked) input.focus();
+                calculateExchange();
+            }
+        }
+
+        function calculateCubeCard(amount, fromCurr) {
+            const baseTwdEl = document.getElementById('cube-base-twd');
+            const feeTwdEl = document.getElementById('cube-fee-twd');
+            const pointsEl = document.getElementById('cube-points');
+            const netTwdEl = document.getElementById('cube-net-twd');
+
+            if (!baseTwdEl) return;
+
+            const rateToTwd = getExchangeRate(fromCurr, 'TWD');
+            const baseTwd = Math.round(amount * rateToTwd);
+            const feeTwd = Math.round(baseTwd * 0.015);
+            const pointsEarned = Math.floor(baseTwd * 0.03);
+            const netTwd = baseTwd + feeTwd - pointsEarned;
+
+            baseTwdEl.textContent = `NT$ ${baseTwd.toLocaleString('zh-TW')}`;
+            feeTwdEl.textContent = `+NT$ ${feeTwd.toLocaleString('zh-TW')}`;
+            pointsEl.textContent = `${pointsEarned.toLocaleString('zh-TW')} 點`;
+            netTwdEl.textContent = `NT$ ${netTwd.toLocaleString('zh-TW')}`;
+        }
+
+        function renderCheatSheet(from, to, rate) {
+            const tbody = document.getElementById('cheat-sheet-tbody');
+            if (!tbody) return;
+            const amounts = [100, 500, 1000, 5000, 10000, 50000];
+            tbody.innerHTML = amounts.map(amt => {
+                const converted = amt * rate;
+                let formatted = (to === 'TWD' || to === 'JPY' || to === 'KRW' || to === 'VND')
+                    ? Math.round(converted).toLocaleString('zh-TW')
+                    : converted.toFixed(2).toLocaleString('zh-TW');
+                return `
+                    <tr class="border-b border-slate-100 hover:bg-slate-50 transition">
+                        <td class="py-3 px-4 font-bold text-slate-700">${amt.toLocaleString()} ${from}</td>
+                        <td class="py-3 px-4 font-bold text-brand-600 text-right">≈ ${formatted} ${to}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function updateExpenseTWDPreview() {
+            const amtInput = document.getElementById('expense-amount');
+            const previewEl = document.getElementById('expense-twd-preview');
+            const fromSelect = document.getElementById('calc-from');
+            if (!amtInput || !previewEl) return;
+
+            const amount = parseFloat(amtInput.value) || 0;
+            const fromCurr = fromSelect ? fromSelect.value : 'JPY';
+            const rateToTwd = getExchangeRate(fromCurr, 'TWD');
+            const twdVal = Math.round(amount * rateToTwd);
+
+            previewEl.value = `NT$ ${twdVal.toLocaleString('zh-TW')}`;
+        }
+
+        function handleAddExpense(e) {
+            e.preventDefault();
+            const titleInput = document.getElementById('expense-title');
+            const catSelect = document.getElementById('expense-category');
+            const amountInput = document.getElementById('expense-amount');
+            const paymentSelect = document.getElementById('expense-payment');
+            const fromSelect = document.getElementById('calc-from');
+
+            const title = titleInput.value.trim();
+            const amount = parseFloat(amountInput.value);
+            if (!title || isNaN(amount) || amount <= 0) return;
+
+            const currency = fromSelect ? fromSelect.value : 'JPY';
+            const rateToTwd = getExchangeRate(currency, 'TWD');
+            const twdEquivalent = Math.round(amount * rateToTwd);
+
+            appData.expenses.unshift({
+                id: 'exp_' + Date.now(),
+                title: title,
+                category: catSelect.value,
+                amount: amount,
+                currency: currency,
+                payment: paymentSelect.value,
+                twdAmount: twdEquivalent,
+                date: new Date().toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+            });
+
+            titleInput.value = '';
+            amountInput.value = '';
+            saveData();
+            showToast('已記錄消費');
+        }
+
+        function deleteExpenseItem(id) {
+            appData.expenses = appData.expenses.filter(i => i.id !== id);
+            saveData();
+            showToast('已刪除消費紀錄');
+        }
+
+        function renderExpenses() {
+            const listEl = document.getElementById('expenses-list');
+            const emptyEl = document.getElementById('expenses-empty');
+            const countBadge = document.getElementById('expense-count-badge');
+
+            if (!listEl) return;
+
+            const expenses = appData.expenses || [];
+            if (countBadge) countBadge.textContent = `共 ${expenses.length} 筆`;
+
+            let cashForeignTotal = 0;
+            let cashTwdTotal = 0;
+            let cardForeignTotal = 0;
+            let cardTwdTotal = 0;
+
+            expenses.forEach(item => {
+                if (item.payment === 'cash') {
+                    cashForeignTotal += item.amount;
+                    cashTwdTotal += item.twdAmount;
+                } else {
+                    cardForeignTotal += item.amount;
+                    cardTwdTotal += item.twdAmount;
+                }
+            });
+
+            const totalForeign = cashForeignTotal + cardForeignTotal;
+            const totalTWD = cashTwdTotal + cardTwdTotal;
+
+            document.getElementById('summary-cash-foreign').textContent = `¥${cashForeignTotal.toLocaleString('zh-TW')}`;
+            document.getElementById('summary-cash-twd').textContent = `NT$ ${cashTwdTotal.toLocaleString('zh-TW')}`;
+
+            document.getElementById('summary-card-foreign').textContent = `¥${cardForeignTotal.toLocaleString('zh-TW')}`;
+            document.getElementById('summary-card-twd').textContent = `NT$ ${cardTwdTotal.toLocaleString('zh-TW')}`;
+
+            document.getElementById('summary-total-foreign').textContent = `¥${totalForeign.toLocaleString('zh-TW')}`;
+            document.getElementById('summary-total-twd').textContent = `NT$ ${totalTWD.toLocaleString('zh-TW')}`;
+
+            if (expenses.length === 0) {
+                listEl.innerHTML = '';
+                if (emptyEl) emptyEl.classList.remove('hidden');
+                return;
+            } else {
+                if (emptyEl) emptyEl.classList.add('hidden');
+            }
+
+            const paymentBadges = {
+                'cash': { label: '💵 現金', class: 'bg-amber-100 text-amber-800' },
+                'cube_card': { label: '💳 CUBE卡(3%)', class: 'bg-emerald-100 text-emerald-800 font-bold' },
+                'other_card': { label: '💳 其他刷卡', class: 'bg-blue-100 text-blue-800' }
+            };
+
+            listEl.innerHTML = expenses.map(item => `
+                <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-3 hover:shadow-md transition">
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2 flex-wrap mb-1">
+                            <span class="text-xs px-2 py-0.5 rounded-md font-bold ${paymentBadges[item.payment]?.class || 'bg-slate-100'}">
+                                ${paymentBadges[item.payment]?.label || '刷卡'}
+                            </span>
+                            <span class="text-sm font-bold text-slate-800 truncate">${escapeHtml(item.title)}</span>
+                            <span class="text-xs text-slate-500 font-medium">· ${item.category}</span>
+                        </div>
+                        <div class="text-xs text-slate-400">${item.date}</div>
+                    </div>
+
+                    <div class="text-right shrink-0">
+                        <div class="font-bold text-slate-800 text-base">${item.amount.toLocaleString('zh-TW')} ${item.currency}</div>
+                        <div class="text-xs text-brand-600 font-bold">≈ NT$ ${item.twdAmount.toLocaleString('zh-TW')}</div>
+                    </div>
+
+                    <button onclick="deleteExpenseItem('${item.id}')" class="text-slate-300 hover:text-red-500 hover:bg-red-50 p-2 rounded-xl transition shrink-0">
+                        <i data-lucide="trash-2" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            `).join('');
+
+            safeCreateIcons();
+        }
+
+        function setupCollageCanvas() {
+            const canvas = document.getElementById('ig-collage-canvas');
+            if (!canvas) return;
+            // 固定高解析度畫布內部尺寸 (IG Story Size)
+            canvas.width = 1080;
+            canvas.height = 1920;
+            
+            // 監聽畫布點擊事件，計算點到哪一個格子
+            canvas.addEventListener('click', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                // 換算點擊座標到 1080x1920 的比例
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                const x = (e.clientX - rect.left) * scaleX;
+                const y = (e.clientY - rect.top) * scaleY;
+                
+                const slots = getCollageSlots();
+                for (let i = 0; i < slots.length; i++) {
+                    const s = slots[i];
+                    if (x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h) {
+                        clickedCollageSlot = i;
+                        document.getElementById('collage-file-input').click();
+                        break;
+                    }
+                }
+            });
+            
+            renderCollageCanvas();
+        }
+
+        function setCollageLayout(layout) {
+            currentCollageLayout = layout;
+            
+            // UI Button styling
+            const btn3 = document.getElementById('layout-btn-3-row');
+            const btn6 = document.getElementById('layout-btn-6-grid');
+            
+            if (layout === '3-row') {
+                btn3.className = 'flex-1 py-3 rounded-xl text-sm sm:text-base font-bold transition shadow-sm bg-brand-500 text-white border-transparent';
+                btn6.className = 'flex-1 py-3 rounded-xl text-sm sm:text-base font-bold transition border bg-white text-slate-600 border-slate-200 hover:bg-slate-50';
+            } else {
+                btn6.className = 'flex-1 py-3 rounded-xl text-sm sm:text-base font-bold transition shadow-sm bg-brand-500 text-white border-transparent';
+                btn3.className = 'flex-1 py-3 rounded-xl text-sm sm:text-base font-bold transition border bg-white text-slate-600 border-slate-200 hover:bg-slate-50';
+            }
+            
+            // 如果從 6張切回 3張，清除後面3張
+            if (layout === '3-row') {
+                for(let i=3; i<6; i++) collageImages[i] = null;
+            }
+            renderCollageCanvas();
+        }
+
+        function getCollageSlots() {
+            const slots = [];
+            const W = 1080;
+            const H = 1920;
+            const pad = 0; // 取消邊緣留白
+            const gap = 0; // 取消圖片間距
+            
+            if (currentCollageLayout === '3-row') {
+                const sw = W;
+                const sh = H / 3;
+                for (let i = 0; i < 3; i++) {
+                    slots.push({
+                        x: 0,
+                        y: i * sh,
+                        w: sw,
+                        h: sh
+                    });
+                }
+            } else { // 6-grid
+                const sw = W / 2;
+                const sh = H / 3;
+                for (let i = 0; i < 6; i++) {
+                    const col = i % 2;
+                    const row = Math.floor(i / 2);
+                    slots.push({
+                        x: col * sw,
+                        y: row * sh,
+                        w: sw,
+                        h: sh
+                    });
+                }
+            }
+            return slots;
+        }
+
+        function handleCollageUpload(e) {
+            const file = e.target.files[0];
+            if (!file || clickedCollageSlot < 0) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const img = new Image();
+                img.onload = function() {
+                    collageImages[clickedCollageSlot] = img;
+                    renderCollageCanvas();
+                    
+                    // 重置 input，容許選取重複的檔名
+                    document.getElementById('collage-file-input').value = '';
+                };
+                img.src = evt.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function renderCollageCanvas() {
+            const canvas = document.getElementById('ig-collage-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const W = 1080;
+            const H = 1920;
+            
+            // 繪製背景 (白色)
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, W, H);
+            
+            const slots = getCollageSlots();
+            
+            slots.forEach((slot, i) => {
+                ctx.save();
+                
+                // 建立矩形遮罩，讓圖片緊密相連，取消原本的圓角
+                ctx.beginPath();
+                ctx.rect(slot.x, slot.y, slot.w, slot.h);
+                ctx.clip(); // 應用遮罩
+                
+                if (collageImages[i]) {
+                    // Draw Image with 'object-fit: cover' logic
+                    const img = collageImages[i];
+                    const imgRatio = img.width / img.height;
+                    const slotRatio = slot.w / slot.h;
+                    
+                    let drawW, drawH, drawX, drawY;
+                    
+                    if (imgRatio > slotRatio) {
+                        // Image is wider
+                        drawH = img.height;
+                        drawW = img.height * slotRatio;
+                        drawX = (img.width - drawW) / 2;
+                        drawY = 0;
+                    } else {
+                        // Image is taller
+                        drawW = img.width;
+                        drawH = img.width / slotRatio;
+                        drawX = 0;
+                        drawY = (img.height - drawH) / 2;
+                    }
+                    
+                    ctx.drawImage(img, drawX, drawY, drawW, drawH, slot.x, slot.y, slot.w, slot.h);
+                } else {
+                    // Draw Placeholder
+                    ctx.fillStyle = '#f1f5f9'; // bg-slate-100
+                    ctx.fillRect(slot.x, slot.y, slot.w, slot.h);
+                    
+                    // 畫上細格線讓使用者在未填滿時能看出格子，放入照片後會被覆蓋
+                    ctx.strokeStyle = '#e2e8f0';
+                    ctx.lineWidth = 4;
+                    ctx.strokeRect(slot.x, slot.y, slot.w, slot.h);
+                    
+                    // Draw Plus Icon
+                    ctx.fillStyle = '#94a3b8'; // text-slate-400
+                    ctx.font = 'bold 80px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('+', slot.x + slot.w/2, slot.y + slot.h/2 + 5);
+                }
+                
+                ctx.restore();
+            });
+        }
+
+        function downloadCollage() {
+            // 檢查是否至少有一張圖片
+            const hasImage = collageImages.some(img => img !== null);
+            if (!hasImage) {
+                showToast('請至少加入一張圖片後再下載');
+                return;
+            }
+            
+            const canvas = document.getElementById('ig-collage-canvas');
+            // 使用 JPEG 並給予 1.0 最高畫質輸出，避免因為 PNG 容量過大，且 IG 最終也會轉成 JPG
+            const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
+            
+            const link = document.createElement('a');
+            link.download = `IG_Collage_${Date.now()}.jpg`;
+            link.href = dataUrl;
+            link.click();
+            
+            showToast('已儲存高畫質拼貼！');
+        }
+
+        function clearCollage() {
+            collageImages = new Array(6).fill(null);
+            renderCollageCanvas();
+            showToast('拼貼已清空');
+        }
+
+        function openResetModal() {
+            const modal = document.getElementById('reset-modal');
+            const input = document.getElementById('reset-code-input');
+            const errorMsg = document.getElementById('reset-error-msg');
+            
+            if (input) {
+                input.value = '';
+                input.classList.remove('border-rose-500', 'ring-rose-500');
+            }
+            if (errorMsg) errorMsg.classList.add('hidden');
+            
+            if (modal) modal.classList.remove('opacity-0', 'pointer-events-none');
+        }
+
+        function closeResetModal() {
+            const modal = document.getElementById('reset-modal');
+            if (modal) modal.classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        function openEnvModal() {
+            const modal = document.getElementById('env-modal');
+            if (modal) modal.classList.remove('opacity-0', 'pointer-events-none');
+        }
+
+        function closeEnvModal() {
+            const modal = document.getElementById('env-modal');
+            if (modal) modal.classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        function executeReset() {
+            const input = document.getElementById('reset-code-input');
+            const errorMsg = document.getElementById('reset-error-msg');
+            
+            if (input && input.value === '0000') {
+                // 驗證成功，執行重置
+                appData = { packing: [], shopping: [], expenses: [] };
+                saveData();
+                closeResetModal();
+                showToast('已成功重置所有清單資料');
+            } else {
+                // 驗證失敗，顯示錯誤
+                if (errorMsg) errorMsg.classList.remove('hidden');
+                if (input) {
+                    input.classList.add('border-rose-500', 'ring-rose-500');
+                    input.focus();
+                    // 2秒後移除紅框效果
+                    setTimeout(() => {
+                        input.classList.remove('border-rose-500', 'ring-rose-500');
+                    }, 2000);
+                }
+            }
+        }
+
+        function viewImage(src, title) {
+            document.getElementById('modal-img').src = src;
+            document.getElementById('modal-img-title').textContent = title;
+            document.getElementById('image-modal').classList.remove('opacity-0', 'pointer-events-none');
+        }
+
+        function closeImageModal() {
+            document.getElementById('image-modal').classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').textContent = msg;
+            toast.classList.remove('opacity-0', 'pointer-events-none');
+            toast.classList.add('translate-y-[-16px]');
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'pointer-events-none');
+                toast.classList.remove('translate-y-[-16px]');
+            }, 2500);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>"']/g, function(m) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+            });
+        }
+    </script>
+</body>
+</html>
