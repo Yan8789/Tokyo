@@ -5,12 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>出國準備 & 購物助手</title>
     
-    <!-- Firebase SDK (使用 Compat 版本以便於單檔直接調用) -->
+    <!-- Firebase SDK (Compat) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
-    <!-- Tailwind CSS CDN -->
+    <!-- LocalForage (IndexedDB) - 解決手機儲存 5MB 限制 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -63,8 +66,7 @@
                     <i data-lucide="plane-takeoff" class="w-7 h-7"></i>
                 </div>
                 <div>
-                    <h1 class="font-bold text-xl text-slate-800 leading-tight">出國助手</h1>
-                    <p class="text-sm text-slate-500">旅行準備、購物清單與匯率記帳</p>
+                    <h1 class="font-bold text-xl text-slate-800 leading-tight tracking-wide">TokyoGoGo</h1>
                 </div>
             </div>
             
@@ -163,7 +165,7 @@
             <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
                 <div>
                     <h3 class="font-bold text-slate-800 text-base">出國購物必買清單</h3>
-                    <p class="text-sm text-slate-500">拍照或上傳圖片，採購比價超方便</p>
+                    <p class="text-sm text-slate-500">拍照比價不漏買</p>
                 </div>
                 <button onclick="openShoppingModal()" class="bg-brand-500 hover:bg-brand-600 text-white font-medium px-4 py-2.5 rounded-xl text-sm sm:text-base flex items-center gap-1.5 shadow-sm active:scale-95 transition">
                     <i data-lucide="plus" class="w-5 h-5"></i> 新增商品
@@ -248,18 +250,9 @@
                     <button onclick="clearCalcAmount()" class="px-3 py-1.5 text-sm rounded-lg bg-rose-50 text-rose-600 font-bold hover:bg-rose-100 ml-auto">歸零</button>
                 </div>
 
-                <div class="p-3 bg-slate-50 rounded-xl text-sm space-y-2 border border-slate-200">
-                    <div class="flex justify-between items-center text-slate-600">
-                        <span>參考匯率：</span>
-                        <span id="rate-display-info" class="font-bold text-slate-800">1 JPY ≈ 0.2150 TWD</span>
-                    </div>
-                    <div class="pt-2 border-t border-slate-200/60 flex flex-wrap gap-2 items-center justify-between">
-                        <label class="text-slate-600 flex items-center gap-2 cursor-pointer font-medium">
-                            <input type="checkbox" id="custom-rate-checkbox" onchange="toggleCustomRate()" class="w-4 h-4 rounded text-brand-500 focus:ring-brand-500">
-                            使用自訂匯率 (包含現金牌告價)
-                        </label>
-                        <input type="number" id="custom-rate-input" step="any" placeholder="例如: 0.218" oninput="calculateExchange()" disabled class="w-28 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-50">
-                    </div>
+                <div class="flex justify-between items-center text-sm text-slate-600 px-1 py-1 bg-slate-50 rounded-xl">
+                    <span class="px-3">當前參考匯率：</span>
+                    <span id="rate-display-info" class="font-bold text-slate-800 px-3">1 JPY ≈ 0.2150 TWD</span>
                 </div>
 
                 <div class="bg-gradient-to-br from-emerald-600 to-teal-700 text-white p-5 rounded-2xl shadow-sm space-y-4">
@@ -420,7 +413,6 @@
             <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center">
                 <div>
                     <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
-                        <!-- 已徹底替換為 SVG，避免 Lucide instagram 報錯 -->
                         <svg class="w-5 h-5 text-pink-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
                             <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
@@ -446,8 +438,8 @@
 
             <p class="text-center text-sm font-medium text-slate-500">👇 點擊畫布中的格子來加入照片</p>
 
-            <div class="relative w-full max-w-sm mx-auto bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
-                <canvas id="ig-collage-canvas" class="w-full h-auto aspect-[9/16] cursor-pointer touch-manipulation hover:opacity-95 transition"></canvas>
+            <div class="relative w-full max-w-sm mx-auto bg-white shadow-md overflow-hidden">
+                <canvas id="ig-collage-canvas" class="w-full h-auto aspect-[9/16] cursor-pointer touch-manipulation transition"></canvas>
                 <input type="file" id="collage-file-input" accept="image/*" class="hidden" onchange="handleCollageUpload(event)">
             </div>
 
@@ -489,7 +481,7 @@
                         <div id="image-upload-prompt" class="py-4 space-y-2">
                             <i data-lucide="camera" class="w-10 h-10 text-slate-400 mx-auto"></i>
                             <p class="text-sm text-slate-600 font-bold">上傳或拍下商品照片</p>
-                            <p class="text-xs text-slate-400">支援 JPG、PNG，將自動壓縮優化</p>
+                            <p class="text-xs text-slate-400">系統將為您自動微縮圖片，節省空間</p>
                         </div>
                     </div>
                 </div>
@@ -541,7 +533,7 @@
     </div>
 
     <script>
-        const STORAGE_KEY = 'travel_assistant_data_v4';
+        const STORAGE_KEY = 'travel_assistant_data_v5';
         const EXCHANGE_STORAGE_KEY = 'travel_exchange_rates_v1';
         
         let appData = { packing: [], shopping: [], expenses: [] };
@@ -555,9 +547,7 @@
         const firebaseConfig = {
             apiKey: "AIzaSyC9hGn1qoXoCYFfbsb5skKufAXDwFA5YY4",
             authDomain: "tokyo-72cf6.firebaseapp.com",
-            databaseURL: "https://tokyo-72cf6-default-rtdb.asia-southeast1.firebasedatabase.app",
             projectId: "tokyo-72cf6",
-            storageBucket: "tokyo-72cf6.firebasestorage.app",
             messagingSenderId: "667762837986",
             appId: "1:667762837986:web:f9aeeaedfeb591b74191bb"
         };
@@ -581,9 +571,8 @@
                     safeCreateIcons();
                     
                     loadDataFromCloud();
-                    showToast('登入成功，雲端同步已啟動');
                 } else {
-                    if (authText) authText.textContent = '登入雲端同步';
+                    if (authText) authText.textContent = '未連線';
                     if (authBtn) authBtn.classList.remove('text-brand-600', 'bg-brand-50');
                     if (authIcon) authIcon.setAttribute('data-lucide', 'cloud');
                     safeCreateIcons();
@@ -594,43 +583,65 @@
 
         function toggleAuth() {
             if (!isFirebaseReady) return showToast('尚未填寫 Firebase Config');
+            if (window.location.protocol === 'blob:') {
+                return alert('⚠️ 安全性提示\n\n因為目前在「預覽環境」(blob 網址)，Firebase 為了安全會阻擋 Google 登入視窗。\n\n請將這份檔案存成 .html，並用正常的瀏覽器開啟即可完美使用！');
+            }
+
             if (currentUser) {
                 firebase.auth().signOut().then(() => showToast('已登出雲端同步'));
             } else {
                 const provider = new firebase.auth.GoogleAuthProvider();
                 firebase.auth().signInWithPopup(provider).catch(e => {
                     console.error('Login failed', e);
-                    // COOP 警告不影響主流程，只需捕捉真正錯誤
                     if(e.code !== 'auth/popup-closed-by-user') {
-                        showToast('登入已取消或發生錯誤');
+                        showToast('登入失敗，請確認網域授權');
                     }
                 });
             }
         }
 
-        function loadDataFromCloud() {
+        // 🌟 雲端讀取：文字與圖片分開讀取，避免超出 1MB 限制
+        async function loadDataFromCloud() {
             if (!isFirebaseReady || !currentUser) return;
             
-            firebase.firestore().collection('users').doc(currentUser.uid).get()
-                .then((doc) => {
-                    if (doc.exists) {
-                        const parsed = doc.data();
-                        appData = {
-                            packing: parsed.packing || [],
-                            shopping: parsed.shopping || [],
-                            expenses: parsed.expenses || []
-                        };
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
-                        renderAll();
-                        showToast('已成功載入雲端紀錄');
-                    } else {
-                        saveData(); 
-                    }
-                })
-                .catch((e) => {
-                    console.error("讀取雲端資料失敗:", e);
-                    showToast('讀取雲端失敗：' + (e.message || '未知錯誤'));
-                });
+            try {
+                const userRef = firebase.firestore().collection('users').doc(currentUser.uid);
+                const doc = await userRef.get();
+                
+                if (doc.exists) {
+                    const cloudData = doc.data();
+                    
+                    // 從雲端子集合 (images) 抓取每一張小圖片
+                    const imagesSnapshot = await userRef.collection('images').get();
+                    const imageMap = {};
+                    imagesSnapshot.forEach(d => {
+                        imageMap[d.id] = d.data().image;
+                    });
+
+                    // 將雲端的圖片文字拼回清單中
+                    const loadedShopping = cloudData.shopping || [];
+                    loadedShopping.forEach(item => {
+                        if (item.image === 'has_image' && imageMap[item.id]) {
+                            item.image = imageMap[item.id];
+                        }
+                    });
+
+                    appData = {
+                        packing: cloudData.packing || [],
+                        shopping: loadedShopping,
+                        expenses: cloudData.expenses || []
+                    };
+                    
+                    await localforage.setItem(STORAGE_KEY, appData);
+                    renderAll();
+                    showToast('已成功載入雲端紀錄');
+                } else {
+                    await saveData(); 
+                }
+            } catch (e) {
+                console.error("讀取雲端資料失敗:", e);
+                showToast('讀取雲端失敗：' + (e.message || '未知錯誤'));
+            }
         }
 
         let currentCollageLayout = '3-row';
@@ -657,8 +668,8 @@
             }
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            loadData();
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadData();
             loadExchangeData();
             fetchExchangeRates();
             safeCreateIcons();
@@ -670,28 +681,65 @@
             window.addEventListener('offline', () => updateRateStatusUI(false));
         });
 
-        function loadData() {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            if (stored) {
-                try {
-                    const parsed = JSON.parse(stored);
-                    appData = { packing: parsed.packing || [], shopping: parsed.shopping || [], expenses: parsed.expenses || [] };
-                } catch (e) {}
-            } else {
-                appData.packing = DEFAULT_PRESETS.slice(0, 6).map((item, idx) => ({
-                    id: 'p_' + Date.now() + '_' + idx, text: item.text, category: item.category, completed: false
-                }));
-                saveData();
+        async function loadData() {
+            try {
+                const stored = await localforage.getItem(STORAGE_KEY);
+                if (stored) {
+                    appData = { 
+                        packing: stored.packing || [], 
+                        shopping: stored.shopping || [], 
+                        expenses: stored.expenses || [] 
+                    };
+                } else {
+                    appData.packing = DEFAULT_PRESETS.slice(0, 6).map((item, idx) => ({
+                        id: 'p_' + Date.now() + '_' + idx, text: item.text, category: item.category, completed: false
+                    }));
+                    await localforage.setItem(STORAGE_KEY, appData);
+                }
+            } catch(e) {
+                console.error("讀取本地資料失敗", e);
             }
         }
 
-        function saveData() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
-            if (isFirebaseReady && currentUser) {
-                firebase.firestore().collection('users').doc(currentUser.uid).set(appData)
-                    .catch(e => console.error("Firebase 同步寫入失敗", e));
+        // 🌟 核心儲存功能：本機存 IndexedDB 無上限，雲端拆成文字與小圖片
+        async function saveData() {
+            renderAll(); // 讓 UI 畫面瞬間更新，不被非同步卡住
+            try {
+                await localforage.setItem(STORAGE_KEY, appData);
+                
+                if (isFirebaseReady && currentUser) {
+                    // 深拷貝一份用來上傳雲端的資料
+                    const cloudData = {
+                        packing: appData.packing,
+                        shopping: appData.shopping.map(item => ({...item})),
+                        expenses: appData.expenses
+                    };
+
+                    const imagesToSave = [];
+                    // 把圖片抽離，主檔案只標記 'has_image'，避免超過 1MB
+                    cloudData.shopping.forEach(item => {
+                        if (item.image && item.image.startsWith('data:image')) {
+                            imagesToSave.push({ id: item.id, image: item.image });
+                            item.image = 'has_image'; 
+                        }
+                    });
+
+                    const userRef = firebase.firestore().collection('users').doc(currentUser.uid);
+                    await userRef.set(cloudData); // 儲存文字主檔
+
+                    // 批次儲存圖片小卡到子集合
+                    if (imagesToSave.length > 0) {
+                        const batch = firebase.firestore().batch();
+                        imagesToSave.forEach(img => {
+                            const imgRef = userRef.collection('images').doc(img.id);
+                            batch.set(imgRef, { image: img.image });
+                        });
+                        await batch.commit();
+                    }
+                }
+            } catch (e) {
+                console.error("儲存失敗", e);
             }
-            renderAll();
         }
 
         function renderAll() {
@@ -706,7 +754,7 @@
                 if (btn && page) {
                     if (t === tab) {
                         page.classList.remove('hidden');
-                        btn.className = 'flex-none py-3.5 px-4 text-sm sm:text-base font-bold text-brand-600 border-b-2 border-brand-500 flex items-center justify-center gap-1.5 transition-all whitespace-nowrap';
+                        btn.className = 'flex-none py-3.5 px-4 text-sm sm:text-base font-semibold text-brand-600 border-b-2 border-brand-500 flex items-center justify-center gap-1.5 transition-all whitespace-nowrap';
                     } else {
                         page.classList.add('hidden');
                         btn.className = 'flex-none py-3.5 px-4 text-sm sm:text-base font-semibold text-slate-500 hover:text-slate-700 border-b-2 border-transparent flex items-center justify-center gap-1.5 transition-all whitespace-nowrap';
@@ -822,6 +870,7 @@
             document.getElementById('shopping-modal').children[0].classList.add('translate-y-full');
         }
 
+        // 🌟 圖片極致壓縮處理 (為 Firestore 量身打造)
         function handleImageSelect(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -831,12 +880,16 @@
                 img.onload = function() {
                     const canvas = document.createElement('canvas');
                     let width = img.width, height = img.height;
-                    const maxDim = 800;
+                    // 將尺寸下調到 400，極致縮小檔案大小，但足以辨識商品
+                    const maxDim = 400; 
                     if (width > height && width > maxDim) { height *= maxDim / width; width = maxDim; } 
                     else if (height > maxDim) { width *= maxDim / height; height = maxDim; }
                     canvas.width = width; canvas.height = height;
                     canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-                    tempBase64Image = canvas.toDataURL('image/jpeg', 0.7);
+                    
+                    // 壓低畫質到 0.6，單張圖片約只佔 10~20KB
+                    tempBase64Image = canvas.toDataURL('image/jpeg', 0.6); 
+                    
                     document.getElementById('image-preview').src = tempBase64Image;
                     document.getElementById('image-preview-container').classList.remove('hidden');
                     document.getElementById('image-upload-prompt').classList.add('hidden');
@@ -863,8 +916,14 @@
             if (item) { item.purchased = !item.purchased; saveData(); }
         }
 
-        function deleteShoppingItem(id) {
-            appData.shopping = appData.shopping.filter(i => i.id !== id); saveData(); showToast('已刪除商品');
+        async function deleteShoppingItem(id) {
+            appData.shopping = appData.shopping.filter(i => i.id !== id); 
+            await saveData(); 
+            // 順手把雲端的圖片刪掉釋放空間
+            if (isFirebaseReady && currentUser) {
+                firebase.firestore().collection('users').doc(currentUser.uid).collection('images').doc(id).delete().catch(e => console.log(e));
+            }
+            showToast('已刪除商品');
         }
 
         function renderShopping() {
@@ -899,7 +958,7 @@
         }
 
         function loadExchangeData() {
-            const stored = localStorage.getItem(EXCHANGE_STORAGE_KEY);
+            const stored = localStorage.getItem(EXCHANGE_STORAGE_KEY); // 匯率純文字保留在 localStorage 即可
             if (stored) {
                 try {
                     const parsed = JSON.parse(stored);
@@ -949,12 +1008,6 @@
         }
 
         function getExchangeRate(fromCurr, toCurr) {
-            const customCheckbox = document.getElementById('custom-rate-checkbox');
-            const customInput = document.getElementById('custom-rate-input');
-            if (customCheckbox && customCheckbox.checked && customInput && customInput.value) {
-                const customVal = parseFloat(customInput.value);
-                if (!isNaN(customVal) && customVal > 0) return customVal;
-            }
             return (exchangeRates[toCurr] || 1) / (exchangeRates[fromCurr] || 1);
         }
 
@@ -991,12 +1044,6 @@
         function clearCalcAmount() {
             const input = document.getElementById('calc-amount');
             if (input) { input.value = 0; calculateExchange(); }
-        }
-
-        function toggleCustomRate() {
-            const checkbox = document.getElementById('custom-rate-checkbox');
-            const input = document.getElementById('custom-rate-input');
-            if (checkbox && input) { input.disabled = !checkbox.checked; if (checkbox.checked) input.focus(); calculateExchange(); }
         }
 
         function calculateCubeCard(amount, fromCurr) {
@@ -1156,7 +1203,7 @@
                     ctx.drawImage(img, dX, dY, dW, dH, s.x, s.y, s.w, s.h);
                 } else {
                     ctx.fillStyle = '#f1f5f9'; ctx.fillRect(s.x, s.y, s.w, s.h);
-                    ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 4; ctx.strokeRect(s.x, s.y, s.w, s.h);
+                    ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 2; ctx.strokeRect(s.x, s.y, s.w, s.h);
                     ctx.fillStyle = '#94a3b8'; ctx.font = 'bold 80px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                     ctx.fillText('+', s.x + s.w/2, s.y + s.h/2 + 5);
                 }
