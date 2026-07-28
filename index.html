@@ -850,11 +850,13 @@
             else showToast('預設項目皆已在清單中');
         }
 
+        // --- 更新版：將行李依照類別群組化渲染 ---
         function renderPacking() {
             const listEl = document.getElementById('packing-list');
             const emptyEl = document.getElementById('packing-empty');
             if (!listEl) return;
             
+            // 計算進度條
             const total = appData.packing.length;
             const completedCount = appData.packing.filter(i => i.completed).length;
             const percentage = total === 0 ? 0 : Math.round((completedCount / total) * 100);
@@ -862,6 +864,7 @@
             document.getElementById('progress-bar').style.width = percentage + '%';
             document.getElementById('progress-text').textContent = percentage + '%';
 
+            // 依據上方按鈕進行狀態篩選
             let filtered = appData.packing;
             if (currentFilter === 'pending') filtered = appData.packing.filter(i => !i.completed);
             if (currentFilter === 'completed') filtered = appData.packing.filter(i => i.completed);
@@ -870,24 +873,71 @@
                 listEl.innerHTML = '';
                 emptyEl.classList.remove('hidden');
                 return;
-            } else emptyEl.classList.add('hidden');
+            } else {
+                emptyEl.classList.add('hidden');
+            }
 
-            const categoryBadges = { '證件': 'bg-amber-100 text-amber-700', '電子': 'bg-blue-100 text-blue-700', '衣物': 'bg-purple-100 text-purple-700', '藥品': 'bg-rose-100 text-rose-700', '其他': 'bg-slate-100 text-slate-600' };
+            const categoryBadges = { 
+                '證件': 'bg-amber-100 text-amber-700', 
+                '電子': 'bg-blue-100 text-blue-700', 
+                '衣物': 'bg-purple-100 text-purple-700', 
+                '藥品': 'bg-rose-100 text-rose-700', 
+                '其他': 'bg-slate-100 text-slate-600' 
+            };
 
-            listEl.innerHTML = filtered.map(item => `
-                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-3 group transition hover:shadow-md ${item.completed ? 'bg-slate-50/70 border-slate-200/80 opacity-80' : ''}">
-                    <div class="flex items-center gap-3 min-w-0 flex-1 cursor-pointer" onclick="togglePackingItem('${item.id}')">
-                        <div class="w-6 h-6 rounded-lg border-2 ${item.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 bg-white'} flex items-center justify-center transition shrink-0">
-                            ${item.completed ? '<i data-lucide="check" class="w-4 h-4 text-white font-bold"></i>' : ''}
+            // 1. 將清單依據類別進行分組
+            const grouped = filtered.reduce((acc, item) => {
+                if (!acc[item.category]) acc[item.category] = [];
+                acc[item.category].push(item);
+                return acc;
+            }, {});
+
+            // 2. 設定固定的類別顯示順序 (確保版面穩定，不會因為新增順序亂跳)
+            const categoryOrder = ['證件', '電子', '衣物', '藥品', '其他'];
+            
+            // 若有自訂類別不在預設清單內，將其附加到最後 (防呆機制)
+            Object.keys(grouped).forEach(cat => {
+                if (!categoryOrder.includes(cat)) categoryOrder.push(cat);
+            });
+
+            // 3. 組合 HTML 結構
+            let htmlString = '';
+            
+            categoryOrder.forEach(cat => {
+                if (grouped[cat] && grouped[cat].length > 0) {
+                    // 渲染類別標題列與分隔線
+                    htmlString += `
+                        <div class="flex items-center gap-3 mt-4 mb-2 first:mt-1">
+                            <span class="text-sm px-2.5 py-1 rounded-md font-bold shrink-0 ${categoryBadges[cat] || categoryBadges['其他']}">${cat}</span>
+                            <div class="h-px bg-slate-200 flex-1 rounded-full"></div>
                         </div>
-                        <span class="text-xs px-2.5 py-1 rounded-md font-bold shrink-0 ${categoryBadges[item.category] || categoryBadges['其他']}">${item.category}</span>
-                        <span class="text-base text-slate-800 truncate ${item.completed ? 'line-through text-slate-500' : 'font-bold'}">${escapeHtml(item.text)}</span>
-                    </div>
-                    <button onclick="deletePackingItem('${item.id}')" class="text-slate-300 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition shrink-0"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
-                </div>
-            `).join('');
+                        <div class="space-y-2.5">
+                    `;
+                    
+                    // 渲染該類別下的所有物品 (移除各別 item 的 tag 以保持畫面簡潔)
+                    htmlString += grouped[cat].map(item => `
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-3 group transition hover:shadow-md ${item.completed ? 'bg-slate-50/70 border-slate-200/80 opacity-80' : ''}">
+                            <div class="flex items-center gap-3 min-w-0 flex-1 cursor-pointer" onclick="togglePackingItem('${item.id}')">
+                                <div class="w-6 h-6 rounded-lg border-2 ${item.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 bg-white'} flex items-center justify-center transition shrink-0">
+                                    ${item.completed ? '<i data-lucide="check" class="w-4 h-4 text-white font-bold"></i>' : ''}
+                                </div>
+                                <span class="text-base text-slate-800 truncate ${item.completed ? 'line-through text-slate-500' : 'font-bold'}">${escapeHtml(item.text)}</span>
+                            </div>
+                            <button onclick="deletePackingItem('${item.id}')" class="text-slate-300 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition shrink-0">
+                                <i data-lucide="trash-2" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    `).join('');
+                    
+                    // 關閉該類別的容器
+                    htmlString += `</div>`; 
+                }
+            });
+
+            listEl.innerHTML = htmlString;
             safeCreateIcons();
         }
+        // --- 結束更新區塊 ---
 
         function openShoppingModal() {
             document.getElementById('shopping-modal').classList.remove('opacity-0', 'pointer-events-none');
