@@ -96,6 +96,9 @@
             <button id="tab-shopping-btn" onclick="switchTab('shopping')" class="flex-none py-3.5 px-4 text-sm sm:text-base font-semibold text-slate-500 hover:text-slate-700 border-b-2 border-transparent flex items-center justify-center gap-1.5 transition-all whitespace-nowrap">
                 <i data-lucide="shopping-bag" class="w-5 h-5"></i> 購物 (<span id="shopping-count">0</span>)
             </button>
+            <button id="tab-coupons-btn" onclick="switchTab('coupons')" class="flex-none py-3.5 px-4 text-sm sm:text-base font-semibold text-slate-500 hover:text-slate-700 border-b-2 border-transparent flex items-center justify-center gap-1.5 transition-all whitespace-nowrap">
+                <i data-lucide="ticket" class="w-5 h-5"></i> 優惠券 (<span id="coupons-count">0</span>)
+            </button>
             <button id="tab-currency-btn" onclick="switchTab('currency')" class="flex-none py-3.5 px-4 text-sm sm:text-base font-semibold text-slate-500 hover:text-slate-700 border-b-2 border-transparent flex items-center justify-center gap-1.5 transition-all whitespace-nowrap">
                 <i data-lucide="calculator" class="w-5 h-5"></i> 匯率計算
             </button>
@@ -110,6 +113,7 @@
 
     <main class="max-w-3xl mx-auto px-4 pt-4">
 
+        <!-- 行李頁面 -->
         <section id="tab-packing" class="space-y-4">
             <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
                 <div class="flex justify-between items-center mb-2 text-base">
@@ -164,6 +168,7 @@
             </div>
         </section>
 
+        <!-- 購物頁面 -->
         <section id="tab-shopping" class="space-y-4 hidden">
             <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
                 <div>
@@ -182,6 +187,27 @@
             </div>
         </section>
 
+        <!-- 優惠券頁面 -->
+        <section id="tab-coupons" class="space-y-4 hidden">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <h3 class="font-bold text-slate-800 text-base">優惠券快取庫</h3>
+                    <p class="text-sm text-slate-500">結帳快速出示條碼或圖片</p>
+                </div>
+                <button onclick="openCouponModal()" class="bg-brand-500 hover:bg-brand-600 text-white font-bold px-4 py-2.5 rounded-xl text-sm sm:text-base flex items-center gap-1.5 shadow-sm active:scale-95 transition">
+                    <i data-lucide="plus" class="w-5 h-5"></i> 新增優惠券
+                </button>
+            </div>
+            <!-- 使用單欄或兩欄佈局，讓圖片維持原比例 -->
+            <div id="coupons-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+            <div id="coupons-empty" class="hidden text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200">
+                <i data-lucide="ticket" class="w-14 h-14 mx-auto text-slate-300 mb-3"></i>
+                <p class="text-base font-bold text-slate-500">目前沒有儲存的優惠券</p>
+                <p class="text-sm text-slate-400 mt-1">點擊「新增優惠券」將圖片或截圖存入這裡吧！</p>
+            </div>
+        </section>
+
+        <!-- 匯率頁面 -->
         <section id="tab-currency" class="space-y-4 hidden">
             <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-2">
                 <div class="flex items-center gap-2">
@@ -313,6 +339,7 @@
             </div>
         </section>
 
+        <!-- 記帳頁面 -->
         <section id="tab-expenses" class="space-y-4 hidden">
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-1.5">
@@ -409,6 +436,7 @@
             </div>
         </section>
 
+        <!-- IG 拼貼頁面 -->
         <section id="tab-collage" class="space-y-4 hidden">
             <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center">
                 <div>
@@ -525,6 +553,49 @@
         </div>
     </div>
 
+    <!-- Modal: Add Coupon -->
+    <div id="coupon-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 opacity-0 pointer-events-none transition-opacity duration-200">
+        <div class="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-6 shadow-xl transform translate-y-full sm:translate-y-0 transition-transform duration-200 space-y-5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2">
+                    <i data-lucide="ticket" class="w-6 h-6 text-brand-500"></i> 新增優惠券
+                </h3>
+                <button onclick="closeCouponModal()" class="text-slate-400 hover:text-slate-600 p-1 bg-slate-100 hover:bg-slate-200 rounded-full transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form onsubmit="handleAddCoupon(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1.5">優惠券名稱 *</label>
+                    <input type="text" id="coupon-title" required placeholder="例：唐吉訶德 5% 折扣、BicCamera" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-brand-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1.5">使用說明 / 備註</label>
+                    <textarea id="coupon-note" rows="2" placeholder="例：滿一萬日幣可免稅加 5% 折扣，出示條碼即可" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1.5">優惠券圖片 (條碼 / QR Code) *</label>
+                    <div class="relative border-2 border-dashed border-slate-300 hover:border-brand-500 rounded-xl p-4 text-center cursor-pointer transition bg-slate-50">
+                        <input type="file" id="coupon-image-input" accept="image/*" onchange="handleCouponImageSelect(event)" required class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                        <div id="coupon-image-preview-container" class="hidden">
+                            <img id="coupon-image-preview" class="max-h-40 mx-auto rounded-lg object-contain mb-2 shadow-sm">
+                            <span class="text-sm text-brand-600 font-bold bg-brand-50 px-3 py-1 rounded-full">點擊更換照片</span>
+                        </div>
+                        <div id="coupon-image-upload-prompt" class="py-4 space-y-2">
+                            <i data-lucide="image-plus" class="w-10 h-10 text-slate-400 mx-auto"></i>
+                            <p class="text-sm text-slate-600 font-bold">上傳優惠券截圖或照片</p>
+                            <p class="text-xs text-slate-400 font-medium">系統會保留較高畫質以利結帳掃描</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="pt-2 flex gap-3">
+                    <button type="button" onclick="closeCouponModal()" class="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 text-base font-bold hover:bg-slate-50 transition">取消</button>
+                    <button type="submit" class="flex-1 py-3 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-base font-bold shadow-sm transition">儲存優惠券</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Modal: Reset Confirmation Dialog (輸入 0000 驗證) -->
     <div id="reset-modal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200">
         <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl space-y-5 text-center">
@@ -553,7 +624,8 @@
             <button onclick="closeImageModal()" class="absolute -top-12 right-0 text-white/80 hover:text-white p-2 bg-white/10 hover:bg-white/20 rounded-full transition">
                 <i data-lucide="x" class="w-6 h-6"></i>
             </button>
-            <img id="modal-img" class="w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl">
+            <!-- 在放大圖片使用 object-contain，並拔除高度限制讓原圖自然呈現比例 -->
+            <img id="modal-img" class="w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl bg-black/50">
             <p id="modal-img-title" class="text-center text-white font-bold mt-4 text-base"></p>
         </div>
     </div>
@@ -568,12 +640,13 @@
         const STORAGE_KEY = 'travel_assistant_data_v6';
         const EXCHANGE_STORAGE_KEY = 'travel_exchange_rates_v1';
         
-        let appData = { packing: [], shopping: [], expenses: [] };
+        let appData = { packing: [], shopping: [], expenses: [], coupons: [] };
         let exchangeRates = { USD: 1, TWD: 32.5, JPY: 153.5, KRW: 1380, EUR: 0.92, GBP: 0.78, THB: 36.2, CNY: 7.25, HKD: 7.81, VND: 25400 };
         let lastRateUpdate = null;
         let isOnlineRate = false;
         let currentFilter = 'all';
         let tempBase64Image = '';
+        let tempCouponImage = '';
 
         // 🟢 Firebase 雲端設定區塊
         const firebaseConfig = {
@@ -656,9 +729,17 @@
                         imageMap[d.id] = d.data().image;
                     });
 
-                    // 拼回清單
+                    // 拼回購物清單
                     const loadedShopping = cloudData.shopping || [];
                     loadedShopping.forEach(item => {
+                        if (item.image === 'has_image' && imageMap[item.id]) {
+                            item.image = imageMap[item.id];
+                        }
+                    });
+
+                    // 拼回優惠券清單
+                    const loadedCoupons = cloudData.coupons || [];
+                    loadedCoupons.forEach(item => {
                         if (item.image === 'has_image' && imageMap[item.id]) {
                             item.image = imageMap[item.id];
                         }
@@ -667,7 +748,8 @@
                     appData = {
                         packing: cloudData.packing || [],
                         shopping: loadedShopping,
-                        expenses: cloudData.expenses || []
+                        expenses: cloudData.expenses || [],
+                        coupons: loadedCoupons
                     };
                     
                     await localforage.setItem(STORAGE_KEY, appData);
@@ -722,7 +804,8 @@
                     appData = { 
                         packing: stored.packing || [], 
                         shopping: stored.shopping || [], 
-                        expenses: stored.expenses || [] 
+                        expenses: stored.expenses || [],
+                        coupons: stored.coupons || []
                     };
                 } else {
                     appData.packing = DEFAULT_PRESETS.slice(0, 6).map((item, idx) => ({
@@ -745,12 +828,21 @@
                     const cloudData = {
                         packing: appData.packing,
                         shopping: appData.shopping.map(item => ({...item})),
-                        expenses: appData.expenses
+                        expenses: appData.expenses,
+                        coupons: appData.coupons.map(item => ({...item}))
                     };
 
                     const imagesToSave = [];
-                    // 抽離圖片
+                    // 抽離購物圖片
                     cloudData.shopping.forEach(item => {
+                        if (item.image && item.image.startsWith('data:image')) {
+                            imagesToSave.push({ id: item.id, image: item.image });
+                            item.image = 'has_image'; 
+                        }
+                    });
+
+                    // 抽離優惠券圖片
+                    cloudData.coupons.forEach(item => {
                         if (item.image && item.image.startsWith('data:image')) {
                             imagesToSave.push({ id: item.id, image: item.image });
                             item.image = 'has_image'; 
@@ -776,11 +868,11 @@
         }
 
         function renderAll() {
-            renderPacking(); renderShopping(); renderExpenses(); updateCounts();
+            renderPacking(); renderShopping(); renderCoupons(); renderExpenses(); updateCounts();
         }
 
         function switchTab(tab) {
-            const tabs = ['packing', 'shopping', 'currency', 'expenses', 'collage'];
+            const tabs = ['packing', 'shopping', 'coupons', 'currency', 'expenses', 'collage'];
             tabs.forEach(t => {
                 const btn = document.getElementById(`tab-${t}-btn`);
                 const page = document.getElementById(`tab-${t}`);
@@ -802,10 +894,120 @@
         function updateCounts() {
             const packingEl = document.getElementById('packing-count');
             const shoppingEl = document.getElementById('shopping-count');
+            const couponsEl = document.getElementById('coupons-count');
             if (packingEl) packingEl.textContent = appData.packing.length;
             if (shoppingEl) shoppingEl.textContent = appData.shopping.length;
+            if (couponsEl) couponsEl.textContent = appData.coupons.length;
         }
 
+        // --- 優惠券系統 ---
+        function openCouponModal() {
+            document.getElementById('coupon-modal').classList.remove('opacity-0', 'pointer-events-none');
+            document.getElementById('coupon-modal').children[0].classList.remove('translate-y-full');
+            tempCouponImage = '';
+            document.getElementById('coupon-image-preview-container').classList.add('hidden');
+            document.getElementById('coupon-image-upload-prompt').classList.remove('hidden');
+            document.getElementById('coupon-image-input').value = '';
+            
+            // 清空表單
+            document.getElementById('coupon-title').value = '';
+            document.getElementById('coupon-note').value = '';
+        }
+
+        function closeCouponModal() {
+            document.getElementById('coupon-modal').classList.add('opacity-0', 'pointer-events-none');
+            document.getElementById('coupon-modal').children[0].classList.add('translate-y-full');
+        }
+
+        function handleCouponImageSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width, height = img.height;
+                    // 將優惠券的畫質上限提高到 800px 以確保掃描條碼清晰
+                    const maxDim = 800; 
+                    if (width > height && width > maxDim) { height *= maxDim / width; width = maxDim; } 
+                    else if (height > maxDim) { width *= maxDim / height; height = maxDim; }
+                    canvas.width = width; canvas.height = height;
+                    canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                    
+                    tempCouponImage = canvas.toDataURL('image/jpeg', 0.8); // 品質稍微調高至 0.8
+                    
+                    document.getElementById('coupon-image-preview').src = tempCouponImage;
+                    document.getElementById('coupon-image-preview-container').classList.remove('hidden');
+                    document.getElementById('coupon-image-upload-prompt').classList.add('hidden');
+                };
+                img.src = evt.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleAddCoupon(e) {
+            e.preventDefault();
+            const titleInput = document.getElementById('coupon-title');
+            const noteInput = document.getElementById('coupon-note');
+            const title = titleInput.value.trim();
+            if (!title) return;
+            if (!tempCouponImage) return showToast('請上傳優惠券圖片');
+
+            // ID 加上 c_ 確保不與購物衝突
+            appData.coupons.unshift({ 
+                id: 'c_' + Date.now(), 
+                title: title, 
+                note: noteInput.value.trim(), 
+                image: tempCouponImage 
+            });
+            
+            closeCouponModal(); 
+            saveData(); 
+            showToast('已新增優惠券');
+        }
+
+        async function deleteCoupon(id) {
+            appData.coupons = appData.coupons.filter(i => i.id !== id); 
+            await saveData(); 
+            if (isFirebaseReady && currentUser) {
+                firebase.firestore().collection('users').doc(currentUser.uid).collection('images').doc(id).delete().catch(e => console.log(e));
+            }
+            showToast('已刪除優惠券');
+        }
+
+        function renderCoupons() {
+            const gridEl = document.getElementById('coupons-grid');
+            const emptyEl = document.getElementById('coupons-empty');
+            if (!gridEl) return;
+
+            if (appData.coupons.length === 0) { 
+                gridEl.innerHTML = ''; 
+                emptyEl.classList.remove('hidden'); 
+                return; 
+            } else {
+                emptyEl.classList.add('hidden');
+            }
+
+            // 採用不裁切的圖片設計 (w-full h-auto)
+            gridEl.innerHTML = appData.coupons.map(item => `
+                <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm flex flex-col h-max transition hover:shadow-md">
+                    <div class="p-3.5 border-b border-slate-100 flex justify-between items-center bg-slate-50/80 gap-2">
+                        <h4 class="font-bold text-slate-800 text-base leading-snug line-clamp-2">${escapeHtml(item.title)}</h4>
+                        <button onclick="deleteCoupon('${item.id}')" class="text-slate-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-xl transition shrink-0">
+                            <i data-lucide="trash-2" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                    <div class="p-3 bg-white">
+                        <img src="${item.image}" alt="${escapeHtml(item.title)}" class="w-full h-auto rounded-xl cursor-pointer shadow-sm hover:opacity-90 transition border border-slate-100" onclick="viewImage('${item.image}', '${escapeHtml(item.title)}')">
+                    </div>
+                    ${item.note ? `<div class="p-3 pt-0 text-sm text-slate-600 font-medium whitespace-pre-line">${escapeHtml(item.note)}</div>` : ''}
+                </div>
+            `).join('');
+            safeCreateIcons();
+        }
+
+        // --- 行李與購物系統 ---
         function handleAddPacking(e) {
             e.preventDefault();
             const input = document.getElementById('packing-input');
@@ -850,13 +1052,11 @@
             else showToast('預設項目皆已在清單中');
         }
 
-        // --- 更新版：將行李依照類別群組化渲染 ---
         function renderPacking() {
             const listEl = document.getElementById('packing-list');
             const emptyEl = document.getElementById('packing-empty');
             if (!listEl) return;
             
-            // 計算進度條
             const total = appData.packing.length;
             const completedCount = appData.packing.filter(i => i.completed).length;
             const percentage = total === 0 ? 0 : Math.round((completedCount / total) * 100);
@@ -864,7 +1064,6 @@
             document.getElementById('progress-bar').style.width = percentage + '%';
             document.getElementById('progress-text').textContent = percentage + '%';
 
-            // 依據上方按鈕進行狀態篩選
             let filtered = appData.packing;
             if (currentFilter === 'pending') filtered = appData.packing.filter(i => !i.completed);
             if (currentFilter === 'completed') filtered = appData.packing.filter(i => i.completed);
@@ -885,27 +1084,22 @@
                 '其他': 'bg-slate-100 text-slate-600' 
             };
 
-            // 1. 將清單依據類別進行分組
             const grouped = filtered.reduce((acc, item) => {
                 if (!acc[item.category]) acc[item.category] = [];
                 acc[item.category].push(item);
                 return acc;
             }, {});
 
-            // 2. 設定固定的類別顯示順序 (確保版面穩定，不會因為新增順序亂跳)
             const categoryOrder = ['證件', '電子', '衣物', '藥品', '其他'];
             
-            // 若有自訂類別不在預設清單內，將其附加到最後 (防呆機制)
             Object.keys(grouped).forEach(cat => {
                 if (!categoryOrder.includes(cat)) categoryOrder.push(cat);
             });
 
-            // 3. 組合 HTML 結構
             let htmlString = '';
             
             categoryOrder.forEach(cat => {
                 if (grouped[cat] && grouped[cat].length > 0) {
-                    // 渲染類別標題列與分隔線
                     htmlString += `
                         <div class="flex items-center gap-3 mt-4 mb-2 first:mt-1">
                             <span class="text-sm px-2.5 py-1 rounded-md font-bold shrink-0 ${categoryBadges[cat] || categoryBadges['其他']}">${cat}</span>
@@ -914,7 +1108,6 @@
                         <div class="space-y-2.5">
                     `;
                     
-                    // 渲染該類別下的所有物品 (移除各別 item 的 tag 以保持畫面簡潔)
                     htmlString += grouped[cat].map(item => `
                         <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between gap-3 group transition hover:shadow-md ${item.completed ? 'bg-slate-50/70 border-slate-200/80 opacity-80' : ''}">
                             <div class="flex items-center gap-3 min-w-0 flex-1 cursor-pointer" onclick="togglePackingItem('${item.id}')">
@@ -929,7 +1122,6 @@
                         </div>
                     `).join('');
                     
-                    // 關閉該類別的容器
                     htmlString += `</div>`; 
                 }
             });
@@ -937,7 +1129,6 @@
             listEl.innerHTML = htmlString;
             safeCreateIcons();
         }
-        // --- 結束更新區塊 ---
 
         function openShoppingModal() {
             document.getElementById('shopping-modal').classList.remove('opacity-0', 'pointer-events-none');
@@ -1036,6 +1227,7 @@
             safeCreateIcons();
         }
 
+        // --- 匯率與記帳功能 ---
         function loadExchangeData() {
             const stored = localStorage.getItem(EXCHANGE_STORAGE_KEY); 
             if (stored) {
@@ -1209,11 +1401,11 @@
             safeCreateIcons();
         }
 
+        // --- IG 拼貼 ---
         let currentCollageLayout = '3-row';
         let collageImages = new Array(8).fill(null); // Max slots is 8 now
         let clickedCollageSlot = -1;
         
-        // 疊加圖片狀態陣列
         let overlays = []; 
         let selectedOverlayIndex = -1;
         let isDraggingOverlay = false;
@@ -1226,7 +1418,6 @@
             canvas.width = 1080; 
             canvas.height = 1920;
             
-            // 加入滑鼠與觸控事件，用於拖曳疊加圖片
             canvas.addEventListener('mousedown', handlePointerDown);
             window.addEventListener('mousemove', handlePointerMove);
             window.addEventListener('mouseup', handlePointerUp);
@@ -1253,7 +1444,6 @@
             const {x, y} = getCanvasCoord(e);
             selectedOverlayIndex = -1;
             
-            // 倒序檢查是否點擊到疊加貼圖 (最上層的先被點到)
             for (let i = overlays.length - 1; i >= 0; i--) {
                 const ov = overlays[i];
                 const w = ov.img.width * ov.scale;
@@ -1263,7 +1453,7 @@
                     isDraggingOverlay = true;
                     dragOffsetX = x - ov.x;
                     dragOffsetY = y - ov.y;
-                    if(e.cancelable) e.preventDefault(); // 防止滑動螢幕
+                    if(e.cancelable) e.preventDefault(); 
                     break;
                 }
             }
@@ -1271,7 +1461,6 @@
             updateOverlayUI();
             renderCollageCanvas();
 
-            // 如果沒點到任何貼圖，則處理格子的點擊上傳事件
             if (selectedOverlayIndex === -1) {
                 const slots = getCollageSlots();
                 for (let i = 0; i < slots.length; i++) {
@@ -1331,7 +1520,7 @@
                 const img = new Image();
                 img.onload = function() {
                     let scale = 1;
-                    if (img.width > 500) scale = 500 / img.width; // 預設大小適中
+                    if (img.width > 500) scale = 500 / img.width; 
                     overlays.push({
                         img: img,
                         x: 1080 / 2 - (img.width * scale) / 2,
@@ -1358,7 +1547,6 @@
                     btn.className = 'collage-layout-btn py-2.5 rounded-xl text-sm font-bold transition border bg-white text-slate-600 border-slate-200 hover:bg-slate-50';
                 }
             });
-            // 換版型時清除原有的底圖 (疊加圖保留)
             collageImages = new Array(8).fill(null);
             renderCollageCanvas();
         }
@@ -1398,11 +1586,9 @@
             if (!canvas) return;
             const ctx = canvas.getContext('2d'), slots = getCollageSlots();
             
-            // 繪製背景
             ctx.fillStyle = '#FFFFFF'; 
             ctx.fillRect(0, 0, 1080, 1920);
             
-            // 繪製格子底圖
             slots.forEach((s, i) => {
                 ctx.save();
                 ctx.beginPath(); ctx.rect(s.x, s.y, s.w, s.h); ctx.clip();
@@ -1421,13 +1607,11 @@
                 ctx.restore();
             });
 
-            // 繪製疊加貼圖
             overlays.forEach((ov, idx) => {
                 const w = ov.img.width * ov.scale;
                 const h = ov.img.height * ov.scale;
                 ctx.drawImage(ov.img, ov.x, ov.y, w, h);
                 
-                // 如果目前是被選取的狀態且不是為了匯出，就畫上虛線外框
                 if (!forDownload && idx === selectedOverlayIndex) {
                     ctx.save();
                     ctx.strokeStyle = '#0ea5e9';
@@ -1443,7 +1627,6 @@
             if (!collageImages.some(img => img !== null) && overlays.length === 0) {
                 return showToast('請至少加入一張圖片');
             }
-            // 繪製乾淨版本 (不包含選取框與空位十字)
             renderCollageCanvas(true); 
             
             const link = document.createElement('a');
@@ -1452,7 +1635,6 @@
             link.click();
             showToast('已儲存高畫質拼貼！');
             
-            // 繪製完畢恢復原狀
             renderCollageCanvas(false); 
         }
 
@@ -1465,6 +1647,7 @@
             showToast('畫布已清空'); 
         }
 
+        // --- 全域工具 ---
         function openResetModal() {
             const input = document.getElementById('reset-code-input');
             if (input) { input.value = ''; input.classList.remove('border-rose-500', 'ring-rose-500'); }
@@ -1477,7 +1660,7 @@
         function executeReset() {
             const input = document.getElementById('reset-code-input');
             if (input && input.value === '0000') {
-                appData = { packing: [], shopping: [], expenses: [] };
+                appData = { packing: [], shopping: [], expenses: [], coupons: [] };
                 saveData(); closeResetModal(); showToast('已成功重置所有清單資料');
             } else {
                 document.getElementById('reset-error-msg').classList.remove('hidden');
@@ -1488,9 +1671,11 @@
         }
 
         function viewImage(src, title) {
-            document.getElementById('modal-img').src = src; document.getElementById('modal-img-title').textContent = title;
+            document.getElementById('modal-img').src = src; 
+            document.getElementById('modal-img-title').textContent = title;
             document.getElementById('image-modal').classList.remove('opacity-0', 'pointer-events-none');
         }
+        
         function closeImageModal() { document.getElementById('image-modal').classList.add('opacity-0', 'pointer-events-none'); }
 
         function showToast(msg) {
